@@ -10,6 +10,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { DashboardGrid } from './dashboard-grid';
 import { DashboardFilters } from './dashboard-filters';
 import { ExportModal } from '@/components/export/export-modal';
+import { KPIBuilder } from './kpi-builder';
 import { useOnboardingStore } from '@/stores/onboarding-store';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,7 +33,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import type { DashboardConfig, ComparisonOptions } from '@/types';
+import type { DashboardConfig, ComparisonOptions, KPIConfig } from '@/types';
 
 interface DashboardContainerProps {
   config: DashboardConfig;
@@ -42,7 +43,7 @@ interface DashboardContainerProps {
 }
 
 export function DashboardContainer({
-  config,
+  config: initialConfig,
   onBack,
   organizationName = 'Organisation',
   subscriptionTier = 'free',
@@ -54,6 +55,7 @@ export function DashboardContainer({
     enabled: false,
     type: 'yoy',
   });
+  const [config, setConfig] = useState<DashboardConfig>(initialConfig);
   
   const columnsMetadata = useOnboardingStore((state) => state.columnsMetadata);
   const dataPreview = useOnboardingStore((state) => state.dataPreview);
@@ -80,6 +82,22 @@ export function DashboardContainer({
     console.log('DashboardContainer.displayData - Generated demo data, first row:', demoData[0]);
     return demoData;
   }, [dataPreview, config]);
+
+  // Gestion de l'ajout de KPI
+  const handleAddKPI = useCallback((newKPI: KPIConfig) => {
+    setConfig(prev => ({
+      ...prev,
+      kpis: [...prev.kpis, newKPI],
+    }));
+  }, []);
+
+  // Gestion de la suppression de KPI
+  const handleRemoveKPI = useCallback((kpiId: string) => {
+    setConfig(prev => ({
+      ...prev,
+      kpis: prev.kpis.filter(k => k.id !== kpiId),
+    }));
+  }, []);
 
   // Gestion du changement de filtres
   const handleFilterChange = useCallback((data: Record<string, unknown>[]) => {
@@ -265,6 +283,16 @@ export function DashboardContainer({
             </div>
 
             <div className="flex items-center gap-2">
+              {/* KPI Builder */}
+              {columnsMetadata && columnsMetadata.length > 0 && (
+                <KPIBuilder
+                  columnsMetadata={columnsMetadata}
+                  data={displayData}
+                  onAddKPI={handleAddKPI}
+                  existingKPIs={config.kpis}
+                />
+              )}
+
               {/* Bouton Partager */}
               <Button variant="outline" size="sm" onClick={handleShare}>
                 <Share2 className="w-4 h-4 mr-2" />

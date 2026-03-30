@@ -422,9 +422,49 @@ function transformDataForChart(
   config: KPIConfig,
   rawData: Record<string, unknown>[]
 ): ChartDataItem[] {
+  if (!rawData || rawData.length === 0) return [];
+
   const { columns, aggregation, chartType } = config;
-  const xCol = columns.x || '';
-  const yCol = columns.y || '';
+  const availableCols = Object.keys(rawData[0] || {});
+
+  // Trouver les colonnes valides
+  let xCol = columns.x || '';
+  let yCol = columns.y || '';
+
+  // Vérifier si les colonnes existent, sinon trouver des alternatives
+  if (xCol && !availableCols.includes(xCol)) {
+    xCol = availableCols.find(c => c.toLowerCase() === xCol.toLowerCase()) || '';
+  }
+  if (yCol && !availableCols.includes(yCol)) {
+    yCol = availableCols.find(c => c.toLowerCase() === yCol.toLowerCase()) || '';
+  }
+
+  // Si toujours pas de colonne Y, chercher une colonne numérique
+  if (!yCol) {
+    const numericPriority = ['value', 'valeur', 'amount', 'montant', 'total', 'count', 'nombre'];
+    yCol = numericPriority.find(p => availableCols.some(c => c.toLowerCase() === p)) || '';
+    if (!yCol) {
+      // Chercher la première colonne numérique
+      yCol = availableCols.find(col => {
+        const val = rawData[0][col];
+        return typeof val === 'number' || (!isNaN(Number(val)) && val !== null && val !== '');
+      }) || '';
+    }
+  }
+
+  // Si toujours pas de colonne X, chercher une colonne catégorielle
+  if (!xCol && chartType !== 'kpi' && chartType !== 'metric') {
+    const categoryPriority = ['region', 'région', 'category', 'catégorie', 'type', 'country', 'pays'];
+    xCol = categoryPriority.find(p => availableCols.some(c => c.toLowerCase().includes(p))) || '';
+    if (!xCol) {
+      xCol = availableCols.find(col => {
+        const val = rawData[0][col];
+        return typeof val === 'string' && isNaN(Number(val));
+      }) || availableCols[0] || '';
+    }
+  }
+
+  console.log(`transformDataForChart - Using xCol: "${xCol}", yCol: "${yCol}"`);
 
   if (chartType === 'donut' || chartType === 'pie' || chartType === 'barList') {
     // Grouper et agréger
