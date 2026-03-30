@@ -1,0 +1,46 @@
+// ============================================
+// InsightGov Africa - Configuration Supabase
+// Migration vers PostgreSQL pour la production
+// ============================================
+
+# ============================================
+# INSTRUCTIONS DE MIGRATION VERS SUPABASE
+# ============================================
+#
+# 1. Créer un compte Supabase (gratuit jusqu'à 500MB)
+#    https://supabase.com
+#
+# 2. Créer un nouveau projet
+#    - Nom: insightgov-africa
+#    - Région: Europe (pour le RGPD)
+#
+# 3. Récupérer les identifiants
+#    Dashboard > Settings > Database
+#
+# 4. Configurer les variables d'environnement
+#    DATABASE_URL="postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres"
+#
+# 5. Exécuter la migration
+#    bunx prisma migrate deploy
+#
+# 6. Configurer le Storage
+#    Dashboard > Storage > Create bucket "uploads"
+#
+# ============================================
+
+// Schéma PostgreSQL pour Supabase
+// Remplacer le contenu de prisma/schema.prisma pour la production
+
+/*
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+// Les modèles restent identiques, seules les lignes ci-dessus changent
+*/

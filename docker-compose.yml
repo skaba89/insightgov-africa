@@ -1,0 +1,89 @@
+# =============================================================================
+# InsightGov Africa - Docker Compose for Local Development
+# =============================================================================
+# Usage:
+#   docker-compose up -d        # Start all services
+#   docker-compose down         # Stop all services
+#   docker-compose logs -f app  # View app logs
+#   docker-compose restart app  # Restart app only
+# =============================================================================
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: insightgov-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: insightgov
+      POSTGRES_PASSWORD: insightgov123
+      POSTGRES_DB: insightgov
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U insightgov -d insightgov"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - insightgov-network
+
+  # Next.js Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: insightgov-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Database
+      DATABASE_URL: postgresql://insightgov:insightgov123@postgres:5432/insightgov?schema=public
+
+      # NextAuth
+      NEXTAUTH_SECRET: local_dev_secret_change_in_production_12345
+      NEXTAUTH_URL: http://localhost:3000
+
+      # AI
+      AI_PROVIDER: groq
+      GROQ_API_KEY: ${GROQ_API_KEY:-your_groq_api_key_here}
+      AI_MODEL: llama-3.3-70b-versatile
+
+      # App
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_APP_NAME: InsightGov Africa
+      NODE_ENV: development
+
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./src:/app/src
+      - ./public:/app/public
+      - ./prisma:/app/prisma
+    networks:
+      - insightgov-network
+
+  # Adminer - Database Management UI (Optional)
+  adminer:
+    image: adminer:latest
+    container_name: insightgov-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - insightgov-network
+
+networks:
+  insightgov-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
