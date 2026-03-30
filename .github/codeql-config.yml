@@ -1,0 +1,31 @@
+# ============================================
+# InsightGov Africa - CodeQL Configuration
+# Custom configuration for CodeQL analysis
+# ============================================
+
+name: InsightGov Africa CodeQL Config
+
+# Paths to include in analysis
+paths:
+  - src
+  - e2e
+
+# Paths to exclude from analysis
+paths-ignore:
+  - '**/node_modules/**'
+  - '**/*.test.ts'
+  - '**/*.spec.ts'
+  - '**/__tests__/**'
+  - '**/dist/**'
+  - '**/.next/**'
+  - '**/coverage/**'
+
+# Exclude specific queries
+query-filters:
+  - exclude:
+      id: js/unused-local-variable
+      id: ts/unused-local-variable
+
+# Additional query suites
+queries:
+  - uses: security-and-quality

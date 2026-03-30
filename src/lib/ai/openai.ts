@@ -2,10 +2,11 @@
  * InsightGov Africa - AI Client
  * ==================================
  * Client IA pour l'analyse sémantique des données et génération de KPIs.
- * Supporte Groq (par défaut) et OpenAI.
+ * Supporte z-ai-sdk (par défaut), Groq et OpenAI.
  */
 
 import OpenAI from 'openai';
+import ZAI from 'z-ai-web-dev-sdk';
 
 // =============================================================================
 // CONFIGURATION
@@ -13,15 +14,25 @@ import OpenAI from 'openai';
 
 /**
  * Détermine quel provider IA utiliser
- * Groq est le défaut (plus rapide et moins cher)
+ * z-ai-sdk est le défaut (intégré et toujours disponible)
  */
-const AI_PROVIDER = (process.env.AI_PROVIDER || 'groq').toLowerCase();
+const AI_PROVIDER = (process.env.AI_PROVIDER || 'z-ai-sdk').toLowerCase();
 
 /**
  * Configuration selon le provider
  */
 const AI_CONFIG = {
+  'z-ai-sdk': {
+    type: 'z-ai-sdk' as const,
+    defaultModel: 'glm-4-plus',
+    models: {
+      fast: 'glm-4-flash',
+      balanced: 'glm-4-plus',
+      advanced: 'glm-4-plus',
+    }
+  },
   groq: {
+    type: 'openai' as const,
     baseURL: 'https://api.groq.com/openai/v1',
     apiKey: process.env.GROQ_API_KEY,
     defaultModel: 'llama-3.3-70b-versatile',
@@ -32,7 +43,8 @@ const AI_CONFIG = {
     }
   },
   openai: {
-    baseURL: undefined, // Default OpenAI URL
+    type: 'openai' as const,
+    baseURL: undefined,
     apiKey: process.env.OPENAI_API_KEY,
     defaultModel: 'gpt-4o',
     models: {
@@ -47,47 +59,204 @@ const AI_CONFIG = {
  * Obtient la configuration actuelle
  */
 function getConfig() {
-  return AI_CONFIG[AI_PROVIDER as keyof typeof AI_CONFIG] || AI_CONFIG.groq;
+  const config = AI_CONFIG[AI_PROVIDER as keyof typeof AI_CONFIG];
+  if (config) return config;
+
+  // Fallback vers z-ai-sdk si le provider demandé n'est pas configuré
+  if (AI_PROVIDER === 'groq' && !process.env.GROQ_API_KEY) {
+    console.log('[AI] GROQ_API_KEY non configuré, utilisation de z-ai-sdk');
+    return AI_CONFIG['z-ai-sdk'];
+  }
+  if (AI_PROVIDER === 'openai' && !process.env.OPENAI_API_KEY) {
+    console.log('[AI] OPENAI_API_KEY non configuré, utilisation de z-ai-sdk');
+    return AI_CONFIG['z-ai-sdk'];
+  }
+
+  return AI_CONFIG['z-ai-sdk'];
 }
 
 // =============================================================================
-// CLIENT IA
+// CLIENT IA UNIFIÉ
 // =============================================================================
 
 /**
- * Crée le client IA configuré
+ * Interface unifiée pour les clients IA
  */
-export function createAIClient() {
+interface UnifiedAIClient {
+  chat: {
+    completions: {
+      create: (params: {
+        messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>;
+        model?: string;
+        temperature?: number;
+        max_tokens?: number;
+        response_format?: { type: 'json_object' | 'text' };
+      }) => Promise<{
+        choices: Array<{
+          message: {
+            content: string | null;
+            role: string;
+          };
+          finish_reason: string;
+        }>;
+        model: string;
+        usage?: {
+          prompt_tokens: number;
+          completion_tokens: number;
+          total_tokens: number;
+        };
+      }>;
+    };
+  };
+}
+
+// Instance singleton pour OpenAI
+let openaiClient: OpenAI | null = null;
+
+// Instance singleton pour Z-AI
+let zaiInstance: Awaited<ReturnType<typeof ZAI.create>> | null = null;
+
+/**
+ * Crée le client Z-AI SDK
+ */
+async function createZAIClient(): Promise<UnifiedAIClient> {
+  if (!zaiInstance) {
+    zaiInstance = await ZAI.create();
+  }
+
+  return {
+    chat: {
+      completions: {
+        create: async (params) => {
+          const response = await zaiInstance!.chat.completions.create({
+            messages: params.messages,
+            temperature: params.temperature,
+            max_tokens: params.max_tokens,
+          });
+
+          return {
+            choices: response.choices.map(choice => ({
+              message: {
+                content: choice.message.content,
+                role: choice.message.role,
+              },
+              finish_reason: choice.finish_reason || 'stop',
+            })),
+            model: response.model || 'glm-4-plus',
+            usage: response.usage,
+          };
+        },
+      },
+    },
+  };
+}
+
+/**
+ * Crée le client OpenAI/Groq
+ */
+function createOpenAIClient(baseURL?: string, apiKey?: string): UnifiedAIClient {
+  if (!openaiClient) {
+    openaiClient = new OpenAI({
+      apiKey: apiKey,
+      baseURL: baseURL,
+    });
+  }
+
+  return {
+    chat: {
+      completions: {
+        create: async (params) => {
+          const response = await openaiClient!.chat.completions.create({
+            messages: params.messages,
+            model: params.model || 'default',
+            temperature: params.temperature,
+            max_tokens: params.max_tokens,
+            response_format: params.response_format,
+          });
+
+          return {
+            choices: response.choices.map(choice => ({
+              message: {
+                content: choice.message.content,
+                role: choice.message.role,
+              },
+              finish_reason: choice.finish_reason,
+            })),
+            model: response.model,
+            usage: response.usage ? {
+              prompt_tokens: response.usage.prompt_tokens,
+              completion_tokens: response.usage.completion_tokens,
+              total_tokens: response.usage.total_tokens,
+            } : undefined,
+          };
+        },
+      },
+    },
+  };
+}
+
+// Client unifié en cache
+let unifiedClient: UnifiedAIClient | null = null;
+let clientType: 'z-ai-sdk' | 'openai' = 'z-ai-sdk';
+
+/**
+ * Retourne l'instance du client IA (synchrone pour compatibilité)
+ * Utilise z-ai-sdk par défaut car toujours disponible
+ */
+export function getAIClient(): UnifiedAIClient {
   const config = getConfig();
-  
+
+  if (config.type === 'z-ai-sdk') {
+    // Pour z-ai-sdk, on retourne un client qui fera l'init async
+    clientType = 'z-ai-sdk';
+    if (!unifiedClient) {
+      // Retourne un proxy qui initialise le client à la première utilisation
+      unifiedClient = {
+        chat: {
+          completions: {
+            create: async (params) => {
+              if (!zaiInstance) {
+                zaiInstance = await ZAI.create();
+              }
+              const response = await zaiInstance.chat.completions.create({
+                messages: params.messages,
+                temperature: params.temperature,
+                max_tokens: params.max_tokens,
+              });
+              return {
+                choices: response.choices.map(choice => ({
+                  message: {
+                    content: choice.message.content,
+                    role: choice.message.role,
+                  },
+                  finish_reason: choice.finish_reason || 'stop',
+                })),
+                model: response.model || 'glm-4-plus',
+                usage: response.usage,
+              };
+            },
+          },
+        },
+      };
+    }
+    return unifiedClient;
+  }
+
+  // Pour OpenAI/Groq
   if (!config.apiKey) {
-    throw new Error(
-      `Clé API manquante. Définissez ${AI_PROVIDER === 'groq' ? 'GROQ_API_KEY' : 'OPENAI_API_KEY'} dans vos variables d'environnement.`
-    );
+    console.log('[AI] Clé API non configurée, fallback vers z-ai-sdk');
+    return getAIClient(); // Récursion avec fallback
   }
-  
-  return new OpenAI({
-    apiKey: config.apiKey,
-    baseURL: config.baseURL,
-  });
-}
 
-// Instance singleton
-let aiClient: OpenAI | null = null;
-
-/**
- * Retourne l'instance singleton du client IA
- */
-export function getAIClient(): OpenAI {
-  if (!aiClient) {
-    aiClient = createAIClient();
+  clientType = 'openai';
+  if (!unifiedClient) {
+    unifiedClient = createOpenAIClient(config.baseURL, config.apiKey);
   }
-  return aiClient;
+  return unifiedClient;
 }
 
 // Alias pour compatibilité
 export const getOpenAIClient = getAIClient;
-export const createOpenAIClient = createAIClient;
 
 // =============================================================================
 // MODÈLES

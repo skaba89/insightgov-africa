@@ -5,6 +5,8 @@
  * Supporte les abonnements et paiements uniques.
  */
 
+import crypto from 'crypto';
+
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -338,7 +340,6 @@ class PaystackClient {
    * Vérifie la signature d'un webhook
    */
   verifyWebhookSignature(payload: string, signature: string): boolean {
-    const crypto = require('crypto');
     const hash = crypto
       .createHmac('sha512', this.config.secretKey)
       .update(payload)

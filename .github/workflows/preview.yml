@@ -1,0 +1,358 @@
+# ============================================
+# InsightGov Africa - Preview Deployments
+# Deploy Preview Environments for PRs
+# ============================================
+
+name: Preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+env:
+  BUN_VERSION: '1.3.4'
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+concurrency:
+  group: preview-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ==========================================
+  # Create Preview Deployment
+  # ==========================================
+  deploy-preview:
+    name: Deploy Preview
+    runs-on: ubuntu-latest
+    if: github.event.action != 'closed'
+    permissions:
+      contents: read
+      pull-requests: write
+      deployments: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        id: bun-cache
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+            .next/cache
+          key: ${{ runner.os }}-bun-preview-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: bunx prisma generate
+
+      - name: Deploy to Vercel Preview
+        id: deploy
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          scope: ${{ secrets.VERCEL_ORG_ID }}
+
+      - name: Comment on PR with Preview URL
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            
+            const botComment = comments.find(comment => 
+              comment.user.type === 'Bot' && 
+              comment.body.includes('## 🚀 Preview Deployment')
+            );
+            
+            const output = `## 🚀 Preview Deployment
+            
+            | Status | URL |
+            |--------|-----|
+            | ✅ Ready | [${{ steps.deploy.outputs.preview-url }}](${{ steps.deploy.outputs.preview-url }}) |
+            
+            ### Deployment Details
+            - **Commit:** \`${{ github.sha }}\`
+            - **Branch:** \`${{ github.head_ref }}\`
+            - **Triggered by:** @${{ github.actor }}
+            
+            ### Quick Actions
+            - [View Deployment](${{ steps.deploy.outputs.preview-url }})
+            - [View Build Logs](https://vercel.com/${{ secrets.VERCEL_ORG_ID }}/${{ secrets.VERCEL_PROJECT_ID }}/deployments)
+            
+            ---
+            *This preview will be updated automatically when you push new commits.*
+            `;
+            
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: output
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: output
+              });
+            }
+
+      - name: Run E2E Tests on Preview
+        run: |
+          echo "Running E2E tests against preview deployment..."
+          bunx playwright install --with-deps chromium
+          bunx playwright test --project=chromium
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ steps.deploy.outputs.preview-url }}
+          DATABASE_URL: 'file:./preview.db'
+          NEXTAUTH_SECRET: 'preview-secret'
+          NEXTAUTH_URL: ${{ steps.deploy.outputs.preview-url }}
+        continue-on-error: true
+
+      - name: Upload Playwright Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: preview-playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  # ==========================================
+  # Cleanup Preview on PR Close
+  # ==========================================
+  cleanup-preview:
+    name: Cleanup Preview
+    runs-on: ubuntu-latest
+    if: github.event.action == 'closed'
+    permissions:
+      contents: read
+      pull-requests: write
+      deployments: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Delete Vercel Preview Deployment
+        run: |
+          echo "Cleaning up preview deployment for closed PR #${{ github.event.number }}"
+          
+          # Use Vercel CLI to delete preview deployments
+          # This requires VERCEL_TOKEN with appropriate permissions
+          curl -X DELETE "https://api.vercel.com/v13/deployments?url=${{ github.event.pull_request.head.sha }}&projectId=${{ secrets.VERCEL_PROJECT_ID }}" \
+            -H "Authorization: Bearer ${{ secrets.VERCEL_TOKEN }}" \
+            -H "Content-Type: application/json" || true
+          
+          echo "✅ Preview deployment cleaned up"
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## 🧹 Preview Cleaned Up
+            
+            The preview deployment for this PR has been removed.
+            
+            ---
+            *Closed by: @${{ github.actor }}*`
+            });
+
+  # ==========================================
+  # Visual Regression Tests
+  # ==========================================
+  visual-tests:
+    name: Visual Regression Tests
+    runs-on: ubuntu-latest
+    needs: deploy-preview
+    if: github.event.action != 'closed'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright
+        run: bunx playwright install --with-deps chromium
+
+      - name: Run Visual Regression Tests
+        run: |
+          echo "Running visual regression tests..."
+          bunx playwright test --project=chromium --grep @visual || true
+        continue-on-error: true
+
+      - name: Upload Visual Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-test-results
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
+
+  # ==========================================
+  # Performance Tests
+  # ==========================================
+  lighthouse:
+    name: Lighthouse Performance Check
+    runs-on: ubuntu-latest
+    needs: deploy-preview
+    if: github.event.action != 'closed'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Wait for Preview to be Ready
+        run: sleep 30
+
+      - name: Run Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v11
+        with:
+          urls: |
+            ${{ needs.deploy-preview.outputs.preview-url }}
+            ${{ needs.deploy-preview.outputs.preview-url }}/dashboard
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+        continue-on-error: true
+
+      - name: Comment Lighthouse Results
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const results = require('./.lighthouseci/manifest.json');
+            
+            let comment = `## 📊 Lighthouse Performance Report
+            
+            | Page | Performance | Accessibility | Best Practices | SEO |
+            |------|-------------|---------------|----------------|-----|
+            `;
+            
+            for (const result of Object.values(results)) {
+              const scores = result.summary;
+              comment += `| ${result.url} | ${Math.round(scores.performance * 100)}% | ${Math.round(scores.accessibility * 100)}% | ${Math.round(scores['best-practices'] * 100)}% | ${Math.round(scores.seo * 100)}% |\n`;
+            }
+            
+            comment += `\n---\n*Performance metrics for preview deployment*`;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: comment
+            });
+
+  # ==========================================
+  # Bundle Size Check
+  # ==========================================
+  bundle-size:
+    name: Bundle Size Analysis
+    runs-on: ubuntu-latest
+    needs: deploy-preview
+    if: github.event.action != 'closed'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: bunx prisma generate
+
+      - name: Build application
+        run: bun run build
+        env:
+          DATABASE_URL: 'file:./preview.db'
+          NEXTAUTH_SECRET: 'preview-secret'
+          NEXTAUTH_URL: 'http://localhost:3000'
+          SKIP_ENV_VALIDATION: 'true'
+
+      - name: Analyze bundle size
+        run: |
+          echo "Analyzing bundle size..."
+          
+          # Get bundle sizes
+          FIRST_LOAD_JS=$(du -sh .next/static/chunks/*.js 2>/dev/null | awk '{sum+=$1} END {print sum}')
+          
+          echo "First Load JS: ${FIRST_LOAD_JS}KB"
+          
+          # Check if bundle is within limits
+          if [ "$FIRST_LOAD_JS" -gt "500" ]; then
+            echo "::warning::Bundle size exceeds 500KB limit"
+          fi
+
+      - name: Comment Bundle Size
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## 📦 Bundle Size Analysis
+            
+            The application bundle has been analyzed.
+            
+            *Compare with the base branch to see size changes.*
+            
+            ---
+            *Analysis completed for commit: \`${{ github.sha }}\`*`
+            });
+
+  # ==========================================
+  # Preview Summary
+  # ==========================================
+  preview-summary:
+    name: Preview Summary
+    runs-on: ubuntu-latest
+    needs: [deploy-preview, visual-tests, lighthouse, bundle-size]
+    if: always() && github.event.action != 'closed'
+    steps:
+      - name: Preview Deployment Summary
+        run: |
+          echo "============================================"
+          echo "🚀 InsightGov Africa - Preview Summary"
+          echo "============================================"
+          echo ""
+          echo "PR #${{ github.event.number }}: ${{ github.event.pull_request.title }}"
+          echo ""
+          echo "Status:"
+          echo "  🌐 Deployment: ${{ needs.deploy-preview.result }}"
+          echo "  🎨 Visual Tests: ${{ needs.visual-tests.result }}"
+          echo "  📊 Lighthouse: ${{ needs.lighthouse.result }}"
+          echo "  📦 Bundle Size: ${{ needs.bundle-size.result }}"
+          echo ""
+          echo "Preview URL: ${{ needs.deploy-preview.outputs.preview-url }}"

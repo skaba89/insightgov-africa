@@ -55,18 +55,18 @@ const DEMO_USER: User = {
 function AuthProviderInner({ children }: { children: React.ReactNode }) {
   const { data: session, status, update } = useSession();
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(true);
-  const [isDemoMode, setIsDemoMode] = useState(false);
   const [hasError, setHasError] = useState(false);
-
-  // Check for demo mode on mount
-  useEffect(() => {
-    const demoMode = localStorage.getItem('insightgov-demo-mode');
-    if (demoMode === 'true') {
-      setIsDemoMode(true);
-      setIsLoading(false);
+  
+  // Check for demo mode on mount - using lazy initialization
+  const [isDemoMode, setIsDemoMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('insightgov-demo-mode') === 'true';
     }
-  }, []);
+    return false;
+  });
+
+  // Compute loading state based on status and demo mode
+  const isLoading = !isDemoMode && status === 'loading';
 
   // Transform session user to our User type
   const user: User | null = isDemoMode
@@ -86,17 +86,9 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
   const organizationId = user?.organizationId || null;
   const isAuthenticated = isDemoMode || status === 'authenticated';
 
-  useEffect(() => {
-    // Handle loading state
-    if (status !== 'loading') {
-      setIsLoading(false);
-    }
-  }, [status]);
-
   // Enable demo mode
   const enableDemoMode = useCallback(() => {
     setIsDemoMode(true);
-    setIsLoading(false);
     setHasError(false);
     localStorage.setItem('insightgov-demo-mode', 'true');
   }, []);

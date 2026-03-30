@@ -3,7 +3,7 @@
 // ============================================
 
 import { describe, it, expect } from 'vitest';
-import { validateFile, validatePassword, sanitizeInput, schemas } from '@/lib/security';
+import { validateFile, validatePassword, sanitizeInput, schemas, rateLimiters, generateCsrfToken } from '@/lib/security';
 
 describe('Security Module', () => {
   describe('Input Sanitization', () => {
@@ -189,7 +189,6 @@ describe('Security Module', () => {
 
 describe('Rate Limiting', () => {
   it('should be defined', () => {
-    const { rateLimiters } = require('@/lib/security');
     expect(rateLimiters.api).toBeDefined();
     expect(rateLimiters.auth).toBeDefined();
     expect(rateLimiters.upload).toBeDefined();
@@ -199,7 +198,6 @@ describe('Rate Limiting', () => {
 
 describe('CSRF Protection', () => {
   it('should generate CSRF token', () => {
-    const { generateCsrfToken } = require('@/lib/security');
     const token = generateCsrfToken();
     expect(token).toBeDefined();
     expect(token.length).toBe(64); // 32 bytes = 64 hex chars
