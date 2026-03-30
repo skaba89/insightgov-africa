@@ -767,6 +767,9 @@ model SSOConfig {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
+  // Relations
+  sessions              SSOSession[]
+
   @@index([organizationId])
   @@index([provider])
   @@index([isActive])
@@ -784,6 +787,9 @@ model SSOSession {
   userAgent       String?
   expiresAt       DateTime
   createdAt       DateTime  @default(now())
+
+  // Relations
+  ssoConfig       SSOConfig @relation(fields: [ssoConfigId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([userId])
