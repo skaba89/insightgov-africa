@@ -952,14 +952,14 @@ export function DashboardFilters({
                             {filterConfig.label}
                           </Label>
                           <Select
-                            value={(filters.get(filterConfig.column)?.value as string) || ''}
-                            onValueChange={(value) => updateFilter(filterConfig.column, value || null)}
+                            value={(filters.get(filterConfig.column)?.value as string) || '__all__'}
+                            onValueChange={(value) => updateFilter(filterConfig.column, value === '__all__' ? null : value)}
                           >
                             <SelectTrigger className="w-48">
                               <SelectValue placeholder="Tous" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="">Tous</SelectItem>
+                              <SelectItem value="__all__">Tous</SelectItem>
                               {values.map((val) => (
                                 <SelectItem key={String(val)} value={String(val)}>
                                   {String(val)}
