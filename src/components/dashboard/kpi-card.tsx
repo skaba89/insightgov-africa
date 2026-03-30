@@ -65,12 +65,12 @@ export function KPICard({
     return 'text-gray-500';
   };
 
-  // Couleur selon le statut
+  // Couleur selon le statut - Modern palette
   const statusColors = {
-    success: 'border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/50',
-    warning: 'border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/50',
-    danger: 'border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/50',
-    neutral: 'border-gray-200 dark:border-gray-700',
+    success: 'border-emerald-200 dark:border-emerald-800 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/50 dark:to-teal-950/50',
+    warning: 'border-amber-200 dark:border-amber-800 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/50 dark:to-orange-950/50',
+    danger: 'border-rose-200 dark:border-rose-800 bg-gradient-to-br from-rose-50 to-red-50 dark:from-rose-950/50 dark:to-red-950/50',
+    neutral: 'border-gray-200 dark:border-gray-700 bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800',
   };
 
   // Taille du composant
@@ -84,6 +84,14 @@ export function KPICard({
     sm: 'text-2xl',
     md: 'text-3xl',
     lg: 'text-4xl',
+  };
+
+  // Modern accent bar colors
+  const accentColors = {
+    success: 'bg-gradient-to-r from-emerald-500 to-teal-500',
+    warning: 'bg-gradient-to-r from-amber-500 to-orange-500',
+    danger: 'bg-gradient-to-r from-rose-500 to-red-500',
+    neutral: 'bg-gradient-to-r from-violet-500 to-purple-500',
   };
 
   return (
@@ -141,9 +149,7 @@ export function KPICard({
               <div
                 className={cn(
                   'h-full rounded-full transition-all',
-                  status === 'success' && 'bg-green-500',
-                  status === 'warning' && 'bg-amber-500',
-                  status === 'danger' && 'bg-red-500'
+                  accentColors[status]
                 )}
                 style={{ width: `${Math.min(100, Number(value))}%` }}
               />

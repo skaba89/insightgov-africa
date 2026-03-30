@@ -34,7 +34,7 @@ interface ChartDataItem {
 }
 
 // =============================================================================
-// COULEURS TREMOR
+// COULEURS TREMOR - Palette moderne et attrayante
 // =============================================================================
 
 const TREMOR_COLORS = [
@@ -49,6 +49,13 @@ const TREMOR_COLORS = [
   'fuchsia',
   'teal',
 ] as const;
+
+// Palette moderne pour les graphiques (couleurs vibrantes)
+const MODERN_CHART_COLORS = {
+  primary: ['violet', 'cyan', 'emerald', 'amber', 'rose'],
+  secondary: ['blue', 'teal', 'lime', 'orange', 'fuchsia'],
+  gradient: ['from-violet-500 to-purple-600', 'from-cyan-500 to-blue-600', 'from-emerald-500 to-teal-600'],
+} as const;
 
 // =============================================================================
 // MAIN COMPONENT
@@ -98,7 +105,7 @@ export function ChartRenderer({ config, data, className }: ChartRendererProps) {
             data={chartData}
             index={config.columns.x || 'name'}
             categories={[config.columns.y || 'value']}
-            colors={config.colors?.length ? config.colors as ('blue' | 'emerald' | 'violet' | 'amber' | 'rose' | 'cyan' | 'lime' | 'orange' | 'fuchsia' | 'teal')[] : ['blue']}
+            colors={config.colors?.length ? config.colors as ('blue' | 'emerald' | 'violet' | 'amber' | 'rose' | 'cyan' | 'lime' | 'orange' | 'fuchsia' | 'teal')[] : ['violet']}
             valueFormatter={(value) => formatChartValue(value, config.valueFormat)}
             showLegend={false}
             showAnimation={true}
@@ -112,7 +119,7 @@ export function ChartRenderer({ config, data, className }: ChartRendererProps) {
             data={chartData}
             index={config.columns.x || 'name'}
             categories={[config.columns.y || 'value']}
-            colors={config.colors?.length ? config.colors as ('blue' | 'emerald' | 'violet' | 'amber' | 'rose' | 'cyan' | 'lime' | 'orange' | 'fuchsia' | 'teal')[] : ['emerald']}
+            colors={config.colors?.length ? config.colors as ('blue' | 'emerald' | 'violet' | 'amber' | 'rose' | 'cyan' | 'lime' | 'orange' | 'fuchsia' | 'teal')[] : ['cyan']}
             valueFormatter={(value) => formatChartValue(value, config.valueFormat)}
             showLegend={false}
             showAnimation={true}
@@ -127,7 +134,7 @@ export function ChartRenderer({ config, data, className }: ChartRendererProps) {
             data={chartData}
             index={config.columns.x || 'name'}
             categories={[config.columns.y || 'value']}
-            colors={config.colors?.length ? config.colors as ('blue' | 'emerald' | 'violet' | 'amber' | 'rose' | 'cyan' | 'lime' | 'orange' | 'fuchsia' | 'teal')[] : ['cyan']}
+            colors={config.colors?.length ? config.colors as ('blue' | 'emerald' | 'violet' | 'amber' | 'rose' | 'cyan' | 'lime' | 'orange' | 'fuchsia' | 'teal')[] : ['emerald']}
             valueFormatter={(value) => formatChartValue(value, config.valueFormat)}
             showLegend={false}
             showAnimation={true}
@@ -142,7 +149,7 @@ export function ChartRenderer({ config, data, className }: ChartRendererProps) {
             data={chartData}
             category="value"
             index="name"
-            colors={config.colors?.length ? config.colors as ('blue' | 'emerald' | 'violet' | 'amber' | 'rose' | 'cyan' | 'lime' | 'orange' | 'fuchsia' | 'teal')[] : ['blue', 'emerald', 'violet', 'amber', 'rose']}
+            colors={config.colors?.length ? config.colors as ('blue' | 'emerald' | 'violet' | 'amber' | 'rose' | 'cyan' | 'lime' | 'orange' | 'fuchsia' | 'teal')[] : ['violet', 'cyan', 'emerald', 'amber', 'rose', 'teal']}
             valueFormatter={(value) => formatChartValue(value, config.valueFormat)}
             showAnimation={true}
             showTooltip={true}
@@ -157,7 +164,7 @@ export function ChartRenderer({ config, data, className }: ChartRendererProps) {
             data={chartData}
             category="value"
             index="name"
-            colors={config.colors?.length ? config.colors as ('blue' | 'emerald' | 'violet' | 'amber' | 'rose' | 'cyan' | 'lime' | 'orange' | 'fuchsia' | 'teal')[] : ['blue', 'emerald', 'violet', 'amber', 'rose']}
+            colors={config.colors?.length ? config.colors as ('blue' | 'emerald' | 'violet' | 'amber' | 'rose' | 'cyan' | 'lime' | 'orange' | 'fuchsia' | 'teal')[] : ['violet', 'cyan', 'emerald', 'amber', 'rose', 'teal']}
             valueFormatter={(value) => formatChartValue(value, config.valueFormat)}
             showAnimation={true}
             showTooltip={true}
@@ -477,42 +484,58 @@ function calculateAggregation(
   data: Record<string, unknown>[],
   config: KPIConfig
 ): number {
-  const yCol = config.columns.y || '';
-  
-  // Si pas de colonne Y spécifiée, essayer de trouver une colonne numérique
-  if (!yCol && data.length > 0) {
-    const firstRow = data[0];
-    const numericCol = Object.keys(firstRow).find(key => {
-      const val = firstRow[key];
-      return typeof val === 'number' || (!isNaN(Number(val)) && val !== null && val !== '');
-    });
-    if (numericCol) {
-      const values = data.map((row) => Number(row[numericCol]) || 0);
-      console.log(`calculateAggregation - Using auto-detected column "${numericCol}", values:`, values.slice(0, 5));
-      return applyAggregation(values, config.aggregation);
-    }
-  }
-  
+  if (!data || data.length === 0) return 0;
+
+  // Liste des colonnes numériques communes à essayer
+  const numericColumnPriority = ['value', 'valeur', 'amount', 'montant', 'total', 'count', 'nombre'];
+
+  // Si pas de colonne Y spécifiée, chercher une colonne numérique
+  let yCol = config.columns.y || '';
+
   // Vérifier si la colonne existe dans les données
-  if (data.length > 0 && !(yCol in data[0])) {
-    console.warn(`calculateAggregation - Column "${yCol}" not found in data. Available columns:`, Object.keys(data[0]));
-    
+  if (yCol && data.length > 0 && !(yCol in data[0])) {
+    console.warn(`calculateAggregation - Column "${yCol}" not found. Available:`, Object.keys(data[0]));
+
     // Essayer de trouver une correspondance insensible à la casse
     const matchingCol = Object.keys(data[0]).find(
       key => key.toLowerCase() === yCol.toLowerCase()
     );
-    
+
     if (matchingCol) {
-      console.log(`calculateAggregation - Found matching column "${matchingCol}"`);
-      const values = data.map((row) => Number(row[matchingCol]) || 0);
-      return applyAggregation(values, config.aggregation);
+      yCol = matchingCol;
+    } else {
+      // Chercher une colonne numérique prioritaire
+      const availableCols = Object.keys(data[0]);
+      yCol = numericColumnPriority.find(priority =>
+        availableCols.some(col => col.toLowerCase() === priority)
+      ) || '';
+
+      // Si toujours pas, prendre la première colonne numérique
+      if (!yCol) {
+        yCol = availableCols.find(key => {
+          const val = data[0][key];
+          return typeof val === 'number' || (!isNaN(Number(val)) && val !== null && val !== '');
+        }) || '';
+      }
     }
-    
+  }
+
+  // Si on n'a toujours pas de colonne, chercher automatiquement
+  if (!yCol && data.length > 0) {
+    const firstRow = data[0];
+    yCol = Object.keys(firstRow).find(key => {
+      const val = firstRow[key];
+      return typeof val === 'number' || (!isNaN(Number(val)) && val !== null && val !== '');
+    }) || '';
+  }
+
+  if (!yCol) {
+    console.warn('calculateAggregation - No numeric column found');
     return 0;
   }
-  
+
   const values = data.map((row) => Number(row[yCol]) || 0);
-  console.log(`calculateAggregation - Column "${yCol}", values:`, values.slice(0, 5), 'sum:', values.reduce((a, b) => a + b, 0));
+  console.log(`calculateAggregation - Using column "${yCol}", sample values:`, values.slice(0, 5), 'sum:', values.reduce((a, b) => a + b, 0));
   return applyAggregation(values, config.aggregation);
 }
 
