@@ -118,51 +118,88 @@ function generateSampleData(columns: DemoColumnMetadata[], rowCount: number = 10
     const row: Record<string, unknown> = {};
 
     columns.forEach((col) => {
+      // IMPORTANT: Utiliser cleanName comme nom de colonne dans les données
       const colName = col.cleanName || col.name;
-      
-      switch (col.dataType) {
-        case 'date':
-          const date = new Date(2024, Math.floor(i / 10), (i % 28) + 1);
-          row[colName] = date.toISOString().split('T')[0];
-          break;
+      const colLower = colName.toLowerCase();
 
-        case 'category':
-          if (col.uniqueValues && col.uniqueValues.length > 0) {
-            row[colName] = col.uniqueValues[i % col.uniqueValues.length];
-          } else if (col.name.toLowerCase().includes('region') || col.cleanName?.toLowerCase().includes('region')) {
-            row[colName] = regions[i % regions.length];
-          } else if (col.name.toLowerCase().includes('mois') || col.cleanName?.toLowerCase().includes('mois')) {
-            row[colName] = months[i % months.length];
-          } else {
-            row[colName] = `Catégorie ${(i % 5) + 1}`;
-          }
-          break;
-
-        case 'numeric':
-        case 'percentage':
-          const min = col.statistics?.min ?? 0;
-          const max = col.statistics?.max ?? 1000;
-          // Générer des données plus réalistes et variées
-          const baseValue = min + (Math.sin(i * 0.3) * 0.5 + 0.5) * (max - min) + Math.random() * (max - min) * 0.2;
-          row[colName] = Math.round(baseValue);
-          break;
-
-        case 'currency':
-          // Générer des montants réalistes
-          const baseAmount = 1000000 + Math.random() * 50000000;
-          row[colName] = Math.round(baseAmount);
-          break;
-
-        default:
-          row[colName] = col.sampleValues[i % col.sampleValues.length] || `Valeur ${i + 1}`;
+      // Détection basée sur le nom de la colonne
+      if (colLower.includes('date') || colLower.includes('mois')) {
+        const date = new Date(2024, Math.floor(i / 10), (i % 28) + 1);
+        row[colName] = date.toISOString().split('T')[0];
+      } else if (colLower.includes('region') || colLower.includes('région')) {
+        row[colName] = regions[i % regions.length];
+      } else if (colLower.includes('consultation')) {
+        // Consultations: 100-500
+        row[colName] = Math.floor(100 + Math.random() * 400);
+      } else if (colLower.includes('vaccination') || colLower.includes('vaccin')) {
+        // Vaccinations: 20-200
+        row[colName] = Math.floor(20 + Math.random() * 180);
+      } else if (colLower.includes('hospitalisation')) {
+        // Hospitalisations: 5-50
+        row[colName] = Math.floor(5 + Math.random() * 45);
+      } else if (colLower.includes('deces') || colLower.includes('décès')) {
+        // Décès: 0-10
+        row[colName] = Math.floor(Math.random() * 11);
+      } else if (colLower.includes('accouchement') || colLower.includes('naissance')) {
+        // Accouchements: 10-60
+        row[colName] = Math.floor(10 + Math.random() * 50);
+      } else if (colLower.includes('taux') || colLower.includes('couverture') || colLower.includes('pourcentage')) {
+        // Taux/Pourcentages: 60-98
+        row[colName] = Math.floor(60 + Math.random() * 38);
+      } else if (colLower.includes('effectif') || colLower.includes('nombre')) {
+        // Effectifs: 1000-50000
+        row[colName] = Math.floor(1000 + Math.random() * 49000);
+      } else if (colLower.includes('enseignant') || colLower.includes('professeur')) {
+        // Enseignants: 50-2000
+        row[colName] = Math.floor(50 + Math.random() * 1950);
+      } else if (colLower.includes('ecole') || colLower.includes('école')) {
+        // Écoles: 10-500
+        row[colName] = Math.floor(10 + Math.random() * 490);
+      } else if (colLower.includes('production') || colLower.includes('tonne')) {
+        // Production: 1000-500000
+        row[colName] = Math.floor(1000 + Math.random() * 499000);
+      } else if (colLower.includes('surface') || colLower.includes('hectare') || colLower.includes('ha')) {
+        // Surface: 100-300000
+        row[colName] = Math.floor(100 + Math.random() * 299900);
+      } else if (colLower.includes('rendement')) {
+        // Rendement: 0.5-4.0
+        row[colName] = Math.round((0.5 + Math.random() * 3.5) * 10) / 10;
+      } else if (colLower.includes('producteur') || colLower.includes('agriculteur')) {
+        // Producteurs: 100-50000
+        row[colName] = Math.floor(100 + Math.random() * 49900);
+      } else if (colLower.includes('budget') || colLower.includes('montant') || colLower.includes('recette') || colLower.includes('depense')) {
+        // Budget: 1M-500M
+        row[colName] = Math.floor(1000000 + Math.random() * 499000000);
+      } else if (colLower.includes('culture') || colLower.includes('type')) {
+        const cultures = ['Mil', 'Arachide', 'Maïs', 'Riz', 'Sorgho'];
+        row[colName] = cultures[i % cultures.length];
+      } else if (colLower.includes('categorie') || colLower.includes('catégorie')) {
+        const categories = ['Personnel', 'Investissement', 'Fonctionnement', 'Subventions'];
+        row[colName] = categories[i % categories.length];
+      } else if (colLower.includes('niveau')) {
+        const niveaux = ['Primaire', 'Secondaire', 'Supérieur'];
+        row[colName] = niveaux[i % niveaux.length];
+      } else if (colLower.includes('campagne') || colLower.includes('exercice') || colLower.includes('annee')) {
+        row[colName] = '2024';
+      } else if (col.dataType === 'category' && col.uniqueValues && col.uniqueValues.length > 0) {
+        row[colName] = col.uniqueValues[i % col.uniqueValues.length];
+      } else if (col.dataType === 'numeric' || col.dataType === 'currency' || col.dataType === 'percentage') {
+        // Valeur numérique générique basée sur les statistiques
+        const min = col.statistics?.min ?? 0;
+        const max = col.statistics?.max ?? 1000;
+        const value = min + Math.random() * (max - min);
+        row[colName] = col.dataType === 'percentage' ? Math.round(value) : Math.floor(value);
+      } else {
+        // Par défaut: utiliser les sampleValues ou générer une valeur
+        row[colName] = col.sampleValues[i % col.sampleValues.length] || `Valeur ${i + 1}`;
       }
     });
 
     data.push(row);
   }
 
-  console.log(`generateSampleData - Generated ${data.length} rows with columns:`, columns.map(c => c.cleanName || c.name));
-  console.log('generateSampleData - Sample row:', data[0]);
+  console.log(`generateSampleData - Generated ${data.length} rows with columns:`, Object.keys(data[0]));
+  console.log('generateSampleData - Sample row:', JSON.stringify(data[0], null, 2));
 
   return data;
 }
