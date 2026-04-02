@@ -3,20 +3,19 @@
 # =============================================================================
 # Support ARM64 (Apple Silicon) et AMD64 (x86_64)
 # Security hardening avec non-root user
-# Cache optimisé pour les layers Docker
+# Utilise Bun pour les performances optimales
 # =============================================================================
 
 # Étape 1: Dépendances de base
-FROM node:20-alpine AS base
+FROM oven/bun:1 AS base
 
 # Installer les dépendances système essentielles
 # OpenSSL: requis pour Prisma
 # curl: pour les health checks
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y \
     openssl \
     curl \
-    libc6-compat \
-    && rm -rf /var/cache/apk/*
+    && rm -rf /var/lib/apt/lists/*
 
 # =============================================================================
 # Étape 2: Installation des dépendances (avec cache)
@@ -25,16 +24,16 @@ FROM base AS deps
 WORKDIR /app
 
 # Copier les fichiers de dépendances en premier (meilleur cache)
-COPY package.json package-lock.json* ./
+COPY package.json bun.lock* ./
 
-# Installer les dépendances avec npm
-# --legacy-peer-deps pour la compatibilité React 19
-RUN npm ci --legacy-peer-deps && \
-    npm cache clean --force
-
-# Copier le schéma Prisma et générer le client
+# Copier le schéma Prisma
 COPY prisma ./prisma/
-RUN npx prisma generate
+
+# Installer les dépendances avec Bun
+RUN bun install --frozen-lockfile
+
+# Générer le client Prisma
+RUN bunx prisma generate
 
 # =============================================================================
 # Étape 3: Build de l'application
@@ -60,13 +59,20 @@ ENV SKIP_ENV_VALIDATION=1
 
 # Build de l'application Next.js
 # standalone: crée un serveur autonome
-RUN npm run build
+RUN bun run build
 
 # =============================================================================
 # Étape 4: Image de production minimale
-FROM base AS runner
+FROM oven/bun:1 AS runner
 
 WORKDIR /app
+
+# Installer OpenSSL pour Prisma runtime, curl pour health checks, et bash pour les scripts
+RUN apt-get update && apt-get install -y \
+    openssl \
+    curl \
+    bash \
+    && rm -rf /var/lib/apt/lists/*
 
 # Variables d'environnement de production
 ENV NODE_ENV=production

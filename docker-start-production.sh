@@ -64,7 +64,7 @@ wait_for_database() {
         attempt=$((attempt + 1))
 
         # Tester la connexion avec prisma migrate deploy
-        if npx prisma migrate deploy --schema=./prisma/schema.prisma 2>/dev/null; then
+        if bunx prisma migrate deploy --schema=./prisma/schema.prisma 2>/dev/null; then
             log_success "✅ Base de données connectée et migrations appliquées!"
             return 0
         fi
@@ -93,12 +93,12 @@ run_migrations() {
     log_info "🔄 Exécution des migrations Prisma..."
 
     # Exécuter les migrations
-    if npx prisma migrate deploy --schema=./prisma/schema.prisma; then
+    if bunx prisma migrate deploy --schema=./prisma/schema.prisma; then
         log_success "✅ Migrations exécutées avec succès"
     else
         log_error "❌ Échec des migrations"
         log_info "Tentative avec db push..."
-        npx prisma db push --accept-data-loss --skip-generate || true
+        bunx prisma db push --accept-data-loss --skip-generate || true
     fi
 }
 
@@ -113,7 +113,7 @@ run_seed() {
 
         # Vérifier si le fichier de seed existe
         if [ -f "./prisma/seed-production.ts" ]; then
-            if npx tsx ./prisma/seed-production.ts; then
+            if bun run ./prisma/seed-production.ts; then
                 log_success "✅ Seed initialisé"
             else
                 log_warning "⚠️  Seed déjà effectué ou erreur non critique"
@@ -210,7 +210,7 @@ prepare_runtime() {
         log_info "Prisma Client disponible"
     else
         log_info "Génération de Prisma Client..."
-        npx prisma generate --schema=./prisma/schema.prisma
+        bunx prisma generate --schema=./prisma/schema.prisma
     fi
 
     # Vérifier le build Next.js
@@ -231,7 +231,7 @@ start_server() {
     log_info "Environnement: ${NODE_ENV:-production}"
 
     # Démarrer le serveur en arrière-plan pour capturer le PID
-    node server.js &
+    bun server.js &
     PID=$!
 
     # Attendre que le serveur soit prêt
