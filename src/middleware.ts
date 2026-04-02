@@ -1,6 +1,25 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+/**
+ * InsightGov Africa - Security Middleware
+ * ========================================
+ * 
+ * NOTE: Next.js 16 shows a deprecation warning for middleware.
+ * This is a planned migration to the new "proxy" system.
+ * The middleware remains fully functional and will be migrated
+ * when the proxy API is fully documented and stable.
+ * 
+ * @see https://nextjs.org/docs/messages/middleware-to-proxy
+ * 
+ * Features:
+ * - Security headers (CSP, HSTS, XSS protection)
+ * - Rate limiting for API routes
+ * - CSRF protection
+ * - IP blocking for known malicious IPs
+ * - Request logging
+ */
+
 // Security headers configuration
 const securityHeaders = {
   // Prevent clickjacking
