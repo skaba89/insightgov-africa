@@ -53,6 +53,8 @@
     "vitest.config.ts",
     "**/*.test.ts",
     "**/*.spec.ts",
-    "skills"
+    "skills",
+    "examples",
+    "mini-services"
   ]
 }
