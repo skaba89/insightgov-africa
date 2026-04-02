@@ -1,0 +1,1053 @@
+// =============================================================================
+// InsightGov Africa - Prisma Schema
+// =============================================================================
+// Plateforme SaaS de génération de dashboards automatisés pour Ministères, ONG et Entreprises
+// Base de données SQLite pour le développement local (PostgreSQL pour la production)
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// NEXTAUTH.JS MODELS
+// =============================================================================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// =============================================================================
+// ORGANISATIONS
+// =============================================================================
+
+/// Organisation cliente (Ministère, ONG, Entreprise)
+model Organization {
+  id              String   @id @default(cuid())
+  name            String
+  type            String   // 'ministry' | 'ngo' | 'enterprise'
+  sector          String   // 'health' | 'education' | 'agriculture' | ...
+  subscriptionTier String  @default("free") // 'free' | 'starter' | 'professional' | 'enterprise'
+  logoUrl         String?
+  country         String?
+  city            String?
+  phone           String?
+  website         String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  users           User[]
+  datasets        Dataset[]
+  subscriptions   Subscription[]
+  invoices        Invoice[]
+
+  @@index([type])
+  @@index([sector])
+  @@index([subscriptionTier])
+}
+
+// =============================================================================
+// UTILISATEURS
+// =============================================================================
+
+/// Utilisateur de la plateforme
+model User {
+  id                       String    @id @default(cuid())
+  email                    String    @unique
+  emailVerified            DateTime?
+  firstName                String?
+  lastName                 String?
+  password                 String?   // Hashed password for credentials auth
+  avatarUrl                String?
+  organizationId           String?
+  role                     String    @default("viewer") // 'owner' | 'admin' | 'analyst' | 'viewer'
+  isActive                 Boolean   @default(true)
+  lastLoginAt              DateTime?
+  verificationToken        String?   // For email verification
+  verificationTokenExpiry  DateTime? // Expiry for verification token
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  // Relations
+  organization      Organization?      @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  accounts          Account[]
+  sessions          Session[]
+  datasets          Dataset[]
+  kpiConfigs        KPIConfig[]
+  reportExports     ReportExport[]
+  comments          Comment[]
+  notifications     Notification[]
+  activityLogs      ActivityLog[]
+  invoices          Invoice[]
+
+  @@index([email])
+  @@index([organizationId])
+}
+
+// =============================================================================
+// DATASETS (FICHIERS UPLOADÉS)
+// =============================================================================
+
+/// Fichier de données uploadé par l'utilisateur
+model Dataset {
+  id               String   @id @default(cuid())
+  organizationId   String?
+  userId           String
+  name             String
+  originalFileName String
+  fileUrl          String
+  fileSize         Int      // en bytes
+  fileType         String   // 'csv' | 'xlsx' | 'xls'
+  rowCount         Int      @default(0)
+  columnCount      Int      @default(0)
+  columnsMetadata  String   @default("[]") // JSON: ColumnMetadata[]
+  status           String   @default("pending") // 'uploading' | 'pending' | 'analyzing' | 'ready' | 'error'
+  errorMessage     String?
+  analyzedAt       DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  organization     Organization?  @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kpiConfigs       KPIConfig[]
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// =============================================================================
+// CONFIGURATIONS KPI
+// =============================================================================
+
+/// Configuration KPI générée par l'IA
+model KPIConfig {
+  id            String   @id @default(cuid())
+  datasetId     String
+  userId        String
+  version       Int      @default(1)
+  configJson    String   // JSON: DashboardConfig
+  isPublished   Boolean  @default(false)
+  generatedAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  dataset       Dataset  @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([datasetId])
+  @@index([userId])
+  @@index([isPublished])
+}
+
+// =============================================================================
+// ABONNEMENTS
+// =============================================================================
+
+/// Abonnement et facturation
+model Subscription {
+  id               String    @id @default(cuid())
+  organizationId   String
+  tier             String    // 'free' | 'starter' | 'professional' | 'enterprise'
+  status           String    @default("active") // 'active' | 'canceled' | 'expired' | 'past_due'
+  price            Float     @default(0)
+  currency         String    @default("EUR")
+  billingCycle     String    @default("monthly") // 'monthly' | 'yearly'
+  currentPeriodEnd DateTime?
+  cancelAtPeriodEnd Boolean  @default(false)
+  paystackCustomerId   String?
+  paystackSubscriptionId String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relations
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invoices        Invoice[]
+
+  @@index([organizationId])
+  @@index([status])
+}
+
+// =============================================================================
+// FACTURES (INVOICES)
+// =============================================================================
+
+/// Facture générée pour un paiement
+model Invoice {
+  id             String    @id @default(cuid())
+  invoiceNumber  String    @unique // Format: INV-YYYY-NNNN
+  userId         String
+  organizationId String
+  subscriptionId String?   // Lien vers l'abonnement associé
+  
+  // Montants
+  subtotal       Float     @default(0)
+  taxRate        Float     @default(0) // Taux de TVA (ex: 18 pour 18%)
+  taxAmount      Float     @default(0)
+  discountAmount Float     @default(0)
+  totalAmount    Float     @default(0)
+  currency       String    @default("EUR")
+  
+  // Statut
+  status         String    @default("pending") // 'draft' | 'pending' | 'paid' | 'overdue' | 'canceled' | 'refunded'
+  
+  // Lignes de facturation (JSON)
+  items          String    @default("[]") // JSON: InvoiceItem[]
+  
+  // Dates importantes
+  issueDate      DateTime  @default(now())
+  dueDate        DateTime
+  paidAt         DateTime?
+  
+  // PDF
+  pdfUrl         String?   // URL du PDF généré
+  pdfGeneratedAt DateTime?
+  
+  // Métadonnées
+  notes          String?   // Notes internes
+  paymentMethod  String?   // 'paystack' | 'bank_transfer' | 'check'
+  paymentReference String? // Référence du paiement
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([invoiceNumber])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([issueDate])
+}
+
+// =============================================================================
+// EXPORTS & RAPPORTS
+// =============================================================================
+
+/// Historique des exports de rapports
+model ReportExport {
+  id           String    @id @default(cuid())
+  datasetId    String
+  userId       String
+  format       String    // 'pdf' | 'excel' | 'image'
+  fileUrl      String?
+  status       String    @default("pending") // 'pending' | 'processing' | 'completed' | 'error'
+  errorMessage String?
+  createdAt    DateTime  @default(now())
+
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([datasetId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// =============================================================================
+// COLLABORATION & PARTAGE
+// =============================================================================
+
+/// Invitation d'un membre à une organisation
+model TeamInvitation {
+  id             String    @id @default(cuid())
+  organizationId String
+  email          String
+  role           String    @default("viewer") // 'admin' | 'analyst' | 'viewer'
+  token          String    @unique
+  invitedBy      String    // userId
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  status         String    @default("pending") // 'pending' | 'accepted' | 'expired' | 'canceled'
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([organizationId])
+  @@index([email])
+  @@index([token])
+  @@index([status])
+}
+
+/// Partage d'un dataset avec d'autres utilisateurs
+model DatasetShare {
+  id           String    @id @default(cuid())
+  datasetId    String
+  sharedBy     String    // userId
+  sharedWith   String?   // userId (null si public)
+  permission   String    @default("view") // 'view' | 'edit' | 'admin'
+  expiresAt    DateTime?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([datasetId])
+  @@index([sharedBy])
+  @@index([sharedWith])
+}
+
+/// Commentaire sur un dataset ou KPI
+model Comment {
+  id          String    @id @default(cuid())
+  datasetId   String?
+  kpiId       String?   // KPIConfig id
+  userId      String
+  parentId    String?   // Pour les réponses
+  content     String
+  mentions    String?   // JSON array d'userIds mentionnés
+  isResolved  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent      Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
+  replies     Comment[] @relation("CommentReplies")
+
+  @@index([datasetId])
+  @@index([kpiId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+/// Notification utilisateur
+model Notification {
+  id           String    @id @default(cuid())
+  userId       String
+  type         String    // 'comment' | 'share' | 'mention' | 'export' | 'alert'
+  title        String
+  message      String
+  data         String?   // JSON payload
+  isRead       Boolean   @default(false)
+  readAt       DateTime?
+  createdAt    DateTime  @default(now())
+
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+/// Activité/Audit log - Enhanced for enterprise tracking
+model ActivityLog {
+  id             String    @id @default(cuid())
+  organizationId String?
+  userId         String?
+  action         String    // 'login' | 'logout' | 'login_failed' | 'upload' | 'analyze' | 'export' | 'share' | 'comment' | 'delete' | 'settings_change' | 'team_add' | 'team_remove' | 'subscription_change' | 'dataset_view' | 'sso_login'
+  entityType     String    // 'dataset' | 'kpi' | 'user' | 'organization' | 'subscription' | 'settings' | 'api_key' | 'sso_config'
+  entityId       String?
+  metadata       String?   // JSON payload with additional context
+  ipAddress      String?
+  userAgent      String?
+  status         String    @default("success") // 'success' | 'failed' | 'pending'
+  errorMessage   String?   // Error message if action failed
+  sessionId      String?   // Session identifier for tracking
+  createdAt      DateTime  @default(now())
+
+  user           User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([action])
+  @@index([status])
+  @@index([createdAt])
+  @@index([entityType])
+}
+
+// =============================================================================
+// API ACCESS & WEBHOOKS
+// =============================================================================
+
+/// Clé API pour intégrations
+model ApiKey {
+  id             String    @id @default(cuid())
+  organizationId String
+  name           String
+  keyHash        String    @unique  // Hash de la clé API
+  keyPrefix      String             // Préfixe visible (ex: "iga_xxxx")
+  permissions    String    @default("read") // JSON: ['read', 'write', 'admin']
+  rateLimit      Int       @default(1000) // Requêtes par heure
+  lastUsedAt     DateTime?
+  expiresAt      DateTime?
+  isActive       Boolean   @default(true)
+  createdBy      String    // userId
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([organizationId])
+  @@index([keyPrefix])
+  @@index([isActive])
+}
+
+/// Webhook pour notifications externes
+model Webhook {
+  id              String     @id @default(cuid())
+  organizationId  String
+  name            String
+  url             String
+  secret          String?    // Secret pour signature HMAC
+  events          String     // JSON: ['dataset.created', 'analysis.completed', ...]
+  isActive        Boolean    @default(true)
+  lastTriggeredAt DateTime?
+  failureCount    Int        @default(0)
+  createdBy       String     // userId
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@index([organizationId])
+  @@index([isActive])
+}
+
+/// Historique des appels webhook
+model WebhookDelivery {
+  id           String    @id @default(cuid())
+  webhookId    String
+  event        String
+  payload      String    // JSON payload envoyé
+  responseCode Int?
+  responseBody String?
+  success      Boolean   @default(false)
+  duration     Int?      // Durée en ms
+  error        String?
+  createdAt    DateTime  @default(now())
+
+  @@index([webhookId])
+  @@index([createdAt])
+}
+
+// =============================================================================
+// KPI & DASHBOARD TEMPLATES
+// =============================================================================
+
+/// Template de KPI prédéfini par secteur
+model KPITemplate {
+  id                  String   @id @default(cuid())
+  sector              String
+  category            String
+  code                String   @unique
+  name                String
+  nameFr              String
+  description         String?
+  formula             String
+  unit                String
+  format              String   @default("number")
+  decimals            Int      @default(0)
+  target              Float?
+  targetSource        String?
+  lowerIsBetter       Boolean  @default(false)
+  sdgAlignment        String?
+  dataSource          String?
+  frequency           String   @default("monthly")
+  disaggregation      String   @default("[]")
+  alertThresholds     String   @default("{}")
+  visualizationType   String?
+  visualizationColors String?
+  requiredColumns     String?
+  dimensions          String?
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([sector])
+  @@index([category])
+  @@index([code])
+  @@index([isActive])
+}
+
+/// Template de dashboard prédéfini
+model DashboardTemplate {
+  id              String   @id @default(cuid())
+  sector          String
+  category        String?
+  code            String   @unique
+  name            String
+  nameFr          String
+  description     String?
+  widgets         String   @default("[]")
+  filters         String   @default("[]")
+  alerts          String   @default("[]")
+  icon            String?
+  tags            String   @default("[]")
+  recommendedFor  String   @default("[]")
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  widgetTemplates WidgetTemplate[]
+
+  @@index([sector])
+  @@index([code])
+  @@index([isActive])
+}
+
+/// Template de widget pour dashboard
+model WidgetTemplate {
+  id                  String           @id @default(cuid())
+  dashboardTemplateId String
+  x                   Int              @default(0)
+  y                   Int              @default(0)
+  width               Int              @default(4)
+  height              Int              @default(3)
+  type                String
+  title               String
+  titleFr             String?
+  kpiTemplateCode     String?
+  config              String           @default("{}")
+  displayOrder        Int              @default(0)
+
+  dashboardTemplate   DashboardTemplate @relation(fields: [dashboardTemplateId], references: [id], onDelete: Cascade)
+
+  @@index([dashboardTemplateId])
+  @@index([kpiTemplateCode])
+}
+
+// =============================================================================
+// BACKUP SYSTEM
+// =============================================================================
+
+/// Backup record for tracking all backup operations
+model Backup {
+  id                String    @id @default(cuid())
+  organizationId    String?   // null for system-wide backups
+  
+  // Backup identification
+  backupNumber      String    @unique // Format: BAK-YYYY-NNNN
+  backupType        String    // 'full' | 'incremental' | 'differential' | 'archive'
+  category          String    // 'database' | 'files' | 'config' | 'full_system'
+  
+  // Status tracking
+  status            String    @default("pending") // 'pending' | 'in_progress' | 'completed' | 'failed' | 'cancelled'
+  progress          Int       @default(0) // 0-100 percentage
+  errorMessage      String?
+  
+  // Size and storage
+  originalSize      Int       @default(0) // Original size in bytes
+  compressedSize    Int       @default(0) // Compressed size in bytes
+  compressionRatio  Float     @default(0)
+  checksum          String?   // SHA-256 hash for integrity verification
+  
+  // Compression and encryption
+  compressionType   String    @default("gzip") // 'none' | 'gzip' | 'brotli' | 'lz4'
+  encrypted         Boolean   @default(false)
+  encryptionType    String?   // 'aes-256-gcm' | 'aes-256-cbc'
+  
+  // Storage location
+  storageBackend    String    @default("local") // 'local' | 's3' | 'gcs' | 'azure' | 'sftp'
+  storagePath       String    // Path or key in storage backend
+  storageBucket     String?   // Bucket name for cloud storage
+  storageRegion     String?   // Region for cloud storage
+  
+  // Retention policy
+  retentionDays     Int       @default(30)
+  retentionCategory String    @default("standard") // 'daily' | 'weekly' | 'monthly' | 'archive'
+  expiresAt         DateTime?
+  
+  // Contents metadata
+  includedTables    String    @default("[]") // JSON: list of database tables
+  includedFiles     String    @default("[]") // JSON: list of file paths/directories
+  metadata          String    @default("{}") // JSON: additional metadata
+  
+  // Timing
+  startedAt         DateTime?
+  completedAt       DateTime?
+  duration          Int?      // Duration in milliseconds
+  
+  // Trigger info
+  triggeredBy       String?   // userId or 'system'
+  triggerType       String    @default("manual") // 'manual' | 'scheduled' | 'auto'
+  scheduleId        String?   // Reference to schedule if triggered by scheduler
+  
+  // Restore tracking
+  lastRestoredAt    DateTime?
+  restoreCount      Int       @default(0)
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([organizationId])
+  @@index([backupType])
+  @@index([category])
+  @@index([status])
+  @@index([storageBackend])
+  @@index([retentionCategory])
+  @@index([createdAt])
+  @@index([expiresAt])
+}
+
+/// Backup schedule configuration
+model BackupSchedule {
+  id                String    @id @default(cuid())
+  organizationId    String?   // null for system-wide backups
+  
+  name              String
+  description       String?
+  
+  // Schedule configuration
+  frequency         String    // 'daily' | 'weekly' | 'monthly' | 'custom'
+  cronExpression    String?   // Custom cron expression for advanced scheduling
+  
+  // Backup configuration
+  backupType        String    @default("incremental") // 'full' | 'incremental' | 'differential'
+  category          String    @default("database") // 'database' | 'files' | 'config' | 'full_system'
+  
+  // Retention
+  retentionDays     Int       @default(30)
+  retentionCategory String    @default("standard")
+  
+  // Contents
+  includedTables    String    @default("[]")
+  includedFiles     String    @default("[]")
+  
+  // Compression and encryption
+  compressionType   String    @default("gzip")
+  encrypted         Boolean   @default(false)
+  
+  // Storage backend
+  storageBackend    String    @default("local")
+  storagePath       String?
+  storageBucket     String?
+  
+  // Status
+  isActive          Boolean   @default(true)
+  lastRunAt         DateTime?
+  lastRunStatus     String?   // 'success' | 'failed' | 'skipped'
+  lastRunBackupId   String?
+  nextRunAt         DateTime?
+  
+  // Notifications
+  notifyOnSuccess   Boolean   @default(false)
+  notifyOnFailure   Boolean   @default(true)
+  notificationEmail String?
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([organizationId])
+  @@index([frequency])
+  @@index([isActive])
+  @@index([nextRunAt])
+}
+
+/// Backup configuration settings
+model BackupConfig {
+  id                String    @id @default(cuid())
+  organizationId    String?   @unique // null for global config
+  
+  // Default settings
+  defaultStorageBackend    String    @default("local")
+  defaultCompressionType   String    @default("gzip")
+  defaultEncryptionEnabled Boolean    @default(false)
+  
+  // Retention policies
+  dailyRetentionDays       Int       @default(7)
+  weeklyRetentionDays      Int       @default(28)  // 4 weeks
+  monthlyRetentionDays     Int       @default(365) // 12 months
+  archiveRetentionYears    Int       @default(7)
+  
+  // Storage backend configurations (encrypted JSON)
+  s3Config                 String?   // JSON: { bucket, region, accessKeyId, secretAccessKey }
+  gcsConfig                String?   // JSON: { bucket, projectId, credentials }
+  azureConfig              String?   // JSON: { connectionString, containerName }
+  sftpConfig               String?   // JSON: { host, port, username, privateKey }
+  
+  // Encryption key (encrypted with master key)
+  encryptionKey            String?   // Base64 encoded encrypted key
+  
+  // Scheduling
+  enableDailyBackups       Boolean   @default(true)
+  enableWeeklyBackups      Boolean   @default(true)
+  enableMonthlyBackups     Boolean   @default(true)
+  
+  // Notifications
+  notificationEmail        String?
+  notifyOnBackupComplete   Boolean   @default(true)
+  notifyOnBackupFailure    Boolean   @default(true)
+  notifyOnRestore          Boolean   @default(true)
+  
+  // Performance
+  maxConcurrentBackups     Int       @default(3)
+  backupTimeoutMinutes     Int       @default(60)
+  
+  // Security
+  requireEncryption        Boolean   @default(false)
+  allowedStorageBackends   String    @default("[\"local\"]") // JSON array
+  
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  @@index([organizationId])
+}
+
+// =============================================================================
+// SSO/SAML CONFIGURATION
+// =============================================================================
+
+/// SSO/SAML configuration for enterprise authentication
+model SSOConfig {
+  id                    String    @id @default(cuid())
+  organizationId        String    @unique
+  provider              String    // 'azure-ad' | 'okta' | 'google-workspace' | 'custom'
+  displayName           String
+  
+  // SAML Configuration
+  entryPoint            String    // Identity Provider SSO URL
+  issuer                String    // Service Provider Entity ID
+  callbackUrl           String    // Assertion Consumer Service URL
+  cert                  String    // Identity Provider Certificate (X.509)
+  privateKey            String?   // Service Provider Private Key (for signed requests)
+  
+  // Attribute Mapping (JSON)
+  attributeMapping      String    @default("{}") // { email, firstName, lastName, groups, department }
+  
+  // Security Settings
+  wantAssertionsSigned  Boolean   @default(true)
+  wantResponseSigned    Boolean   @default(false)
+  signMetadata          Boolean   @default(false)
+  identifierFormat      String    @default("urn:oasis:names:tc:SAML:2.0:nameid-format:emailAddress")
+  acceptedClockSkewMs   Int       @default(300000) // 5 minutes
+  
+  // Auto-provisioning
+  autoProvision         Boolean   @default(true)
+  defaultRole           String    @default("viewer")
+  groupRoleMapping      String?   @default("{}") // JSON: { "group_name": "role" }
+  
+  // Status
+  isActive              Boolean   @default(false)
+  isDefault             Boolean   @default(false)
+  
+  // Metadata
+  lastUsedAt            DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  sessions              SSOSession[]
+
+  @@index([organizationId])
+  @@index([provider])
+  @@index([isActive])
+}
+
+/// SSO session tracking
+model SSOSession {
+  id              String    @id @default(cuid())
+  organizationId  String
+  userId          String
+  ssoConfigId     String
+  nameID          String    // SAML NameID
+  sessionIndex    String?   // SAML SessionIndex for logout
+  ipAddress       String?
+  userAgent       String?
+  expiresAt       DateTime
+  createdAt       DateTime  @default(now())
+
+  // Relations
+  ssoConfig       SSOConfig @relation(fields: [ssoConfigId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([ssoConfigId])
+  @@index([nameID])
+  @@index([expiresAt])
+}
+
+// =============================================================================
+// SECURITY AUDIT LOGS
+// =============================================================================
+
+/// Security audit log for comprehensive tracking
+model AuditLog {
+  id             String    @id @default(cuid())
+  organizationId String?
+  userId         String?
+  
+  // Action details
+  action         String    // Enum: LOGIN, LOGOUT, SECURITY_VIOLATION, etc.
+  severity       String    @default("LOW") // LOW | MEDIUM | HIGH | CRITICAL
+  description    String
+  
+  // Resource context
+  resourceId     String?
+  resourceType   String?   // DATASET | KPI | USER | ORGANIZATION | API_KEY
+  
+  // Request context
+  ipAddress      String?
+  userAgent      String?
+  
+  // Additional metadata
+  metadata       String    @default("{}") // JSON: additional context
+  
+  // Resolution tracking
+  resolved       Boolean   @default(false)
+  resolvedAt     DateTime?
+  resolvedBy     String?   // userId who resolved
+  
+  createdAt      DateTime  @default(now())
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([action])
+  @@index([severity])
+  @@index([resourceId])
+  @@index([createdAt])
+  @@index([resolved])
+}
+
+/// Security settings per organization
+model SecuritySettings {
+  id                        String   @id @default(cuid())
+  organizationId            String   @unique
+  
+  // Password policy
+  minPasswordLength        Int      @default(12)
+  requireUppercase         Boolean  @default(true)
+  requireLowercase         Boolean  @default(true)
+  requireNumbers           Boolean  @default(true)
+  requireSpecialChars      Boolean  @default(true)
+  passwordExpiryDays       Int      @default(90)
+  preventPasswordReuse     Int      @default(5) // Last N passwords
+  
+  // Session settings
+  sessionTimeoutMinutes    Int      @default(30)
+  maxConcurrentSessions    Int      @default(5)
+  requireMfa               Boolean  @default(false)
+  mfaProvider              String?  // 'totp' | 'sms' | 'email'
+  
+  // IP restrictions
+  ipWhitelist              String   @default("[]") // JSON array of allowed IPs
+  ipBlacklist              String   @default("[]") // JSON array of blocked IPs
+  geoBlockingEnabled       Boolean  @default(false)
+  allowedCountries         String   @default("[]") // JSON array of country codes
+  
+  // Rate limiting
+  apiRateLimit             Int      @default(1000) // requests per hour
+  loginRateLimit           Int      @default(5) // attempts per 15 min
+  
+  // Data protection
+  encryptionAtRest         Boolean  @default(true)
+  encryptionKeyId          String?  // Reference to encryption key
+  
+  // Audit settings
+  auditLogRetentionDays    Int      @default(365)
+  logAllApiRequests        Boolean  @default(true)
+  logDataAccess            Boolean  @default(true)
+  
+  // Alert settings
+  alertOnSuspiciousActivity Boolean @default(true)
+  alertOnFailedLogins      Boolean  @default(true)
+  alertEmails              String   @default("[]") // JSON array of emails
+  
+  // Compliance
+  gdprEnabled              Boolean  @default(true)
+  dataRetentionDays        Int      @default(730) // 2 years default
+  
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@index([organizationId])
+}
+
+/// Blocked IP addresses
+model BlockedIP {
+  id             String    @id @default(cuid())
+  ipAddress      String    @unique
+  reason         String
+  blockedBy      String?   // userId or 'system'
+  autoBlocked    Boolean   @default(false)
+  expiresAt      DateTime? // null = permanent
+  createdAt      DateTime  @default(now())
+
+  @@index([ipAddress])
+  @@index([expiresAt])
+}
+
+/// Two-factor authentication tokens
+model TwoFactorToken {
+  id             String    @id @default(cuid())
+  userId         String
+  token          String    @unique
+  type           String    // 'totp' | 'backup'
+  used           Boolean   @default(false)
+  usedAt         DateTime?
+  expiresAt      DateTime
+  createdAt      DateTime  @default(now())
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+}
+
+// =============================================================================
+// CLIENT BRANDING & CUSTOMIZATION
+// =============================================================================
+
+/// Personnalisation visuelle par organisation/client
+model ClientBranding {
+  id                String   @id @default(cuid())
+  organizationId    String   @unique
+  
+  // Logo et identité
+  logoUrl           String?  // Logo principal
+  logoUrlDark       String?  // Logo pour mode sombre
+  faviconUrl        String?  // Favicon personnalisé
+  
+  // Couleurs
+  primaryColor      String   @default("#7c3aed")   // Couleur principale
+  secondaryColor    String   @default("#10b981")   // Couleur secondaire
+  accentColor       String   @default("#f59e0b")   // Couleur d'accent
+  backgroundColor   String   @default("#ffffff")   // Fond clair
+  textColor         String   @default("#1f2937")   // Texte principal
+  
+  // Polices
+  fontFamily        String   @default("Inter")     // Police principale
+  headingFont       String   @default("Inter")     // Police des titres
+  
+  // Dashboard
+  dashboardTitle    String?  // Titre personnalisé du dashboard
+  welcomeMessage    String?  // Message de bienvenue
+  footerText        String?  // Texte du footer
+  
+  // Graphiques
+  chartColors       String   @default("[\"#7c3aed\", \"#10b981\", \"#f59e0b\", \"#ef4444\", \"#3b82f6\", \"#ec4899\"]")
+  chartStyle        String   @default("modern")    // 'modern' | 'classic' | 'minimal'
+  
+  // Domaine personnalisé
+  customDomain      String?  // Domaine personnalisé (ex: dash.client.com)
+  customDomainVerified Boolean @default(false)
+  
+  // White-label
+  hideInsightGovBranding Boolean @default(false)  // Masquer "Powered by InsightGov"
+  customEmailFrom  String?  // Adresse email personnalisée pour les exports
+  
+  // Statut
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([customDomain])
+}
+
+// =============================================================================
+// SMS NOTIFICATIONS
+// =============================================================================
+
+/// SMS log for tracking all sent messages
+model SMSLog {
+  id             String    @id @default(cuid())
+  organizationId String?
+  userId         String?
+  
+  // Message details
+  phone          String
+  message        String
+  templateId     String?
+  
+  // Status
+  status         String    @default("pending") // 'pending' | 'sent' | 'failed' | 'delivered' | 'undelivered'
+  
+  // Provider info
+  provider       String    // 'twilio' | 'orange' | 'africas_talking' | 'nexmo'
+  messageId      String?   // Provider's message ID
+  errorCode      String?
+  errorMessage   String?
+  
+  // Cost tracking
+  cost           Float?
+  currency       String    @default("USD")
+  segments       Int       @default(1)
+  
+  // Metadata
+  priority       String    @default("normal") // 'low' | 'normal' | 'high' | 'urgent'
+  metadata       String    @default("{}") // JSON: additional context
+  
+  // Delivery tracking
+  sentAt         DateTime?
+  deliveredAt    DateTime?
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([phone])
+  @@index([status])
+  @@index([provider])
+  @@index([createdAt])
+}
+
+/// User phone numbers for SMS notifications
+model UserPhone {
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  phone          String
+  
+  // Verification
+  isVerified     Boolean   @default(false)
+  verifiedAt     DateTime?
+  verificationCode String?
+  verificationExpires DateTime?
+  
+  // Settings
+  isPrimary      Boolean   @default(true)
+  receiveAlerts  Boolean   @default(true)
+  receiveNotifications Boolean @default(true)
+  receiveMarketing Boolean  @default(false)
+  
+  // Metadata
+  country        String?
+  carrier        String?
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([phone])
+}

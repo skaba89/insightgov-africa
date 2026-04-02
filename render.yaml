@@ -1,0 +1,79 @@
+# =============================================================================
+# InsightGov Africa - Render Configuration (Production)
+# =============================================================================
+# Ce fichier configure le déploiement sur Render (render.com)
+# =============================================================================
+
+services:
+  # Web Service - Application Next.js
+  - type: web
+    name: insightgov-africa
+    runtime: docker
+    region: frankfurt # Le plus proche de l'Afrique de l'Ouest
+    plan: starter # Gratuit pour commencer, upgrade vers 'standard' pour la prod
+    branch: main
+    dockerfilePath: ./Dockerfile
+    
+    # Auto-deploy on push to main
+    autoDeploy: true
+
+    # Variables d'environnement
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # PostgreSQL Database (connecté à la DB ci-dessous)
+      - key: DATABASE_URL
+        fromDatabase:
+          name: insightgov-db
+          property: connectionString
+
+      # NextAuth.js
+      - key: NEXTAUTH_SECRET
+        generateValue: true # Génère automatiquement un secret sécurisé
+
+      - key: NEXTAUTH_URL
+        value: https://insightgov-africa.onrender.com
+
+      # Groq AI
+      - key: AI_PROVIDER
+        value: groq
+
+      - key: GROQ_API_KEY
+        sync: false # À définir manuellement dans le dashboard
+
+      - key: AI_MODEL
+        value: llama-3.3-70b-versatile
+
+      # Paystack (Paiements)
+      - key: PAYSTACK_SECRET_KEY
+        sync: false # À définir manuellement
+
+      - key: NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
+        sync: false # À définir manuellement
+
+      # App
+      - key: NEXT_PUBLIC_APP_URL
+        value: https://insightgov-africa.onrender.com
+
+      - key: NEXT_PUBLIC_APP_NAME
+        value: InsightGov Africa
+
+    # Health check
+    healthCheckPath: /api/health
+
+    # Disk storage (for file uploads)
+    disk:
+      name: uploads
+      mountPath: /app/uploads
+      sizeGB: 1
+
+# =============================================================================
+# BASE DE DONNÉES PostgreSQL
+# =============================================================================
+databases:
+  - name: insightgov-db
+    databaseName: insightgov
+    user: insightgov
+    region: frankfurt
+    plan: starter # Gratuit (limité à 90 jours), puis $7/mois

@@ -1,0 +1,109 @@
+# =============================================================================
+# InsightGov Africa - Docker Compose for Local Development
+# =============================================================================
+# Usage:
+#   docker-compose up -d        # Start all services
+#   docker-compose down         # Stop all services
+#   docker-compose logs -f app  # View app logs
+#   docker-compose restart app  # Restart app only
+#
+# SECURITY: All secrets are now externalized to .env file
+# Create a .env file from .env.example before running
+# =============================================================================
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: insightgov-db
+    restart: unless-stopped
+    environment:
+      # SECURITY: Using environment variables instead of hardcoded values
+      POSTGRES_USER: ${DB_USER:-insightgov}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required - set it in .env file}
+      POSTGRES_DB: ${DB_NAME:-insightgov}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-insightgov} -d ${DB_NAME:-insightgov}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - insightgov-network
+
+  # Next.js Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: insightgov-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Database - SECURITY: Using environment variables
+      DATABASE_URL: postgresql://${DB_USER:-insightgov}:${DB_PASSWORD:?DB_PASSWORD is required}@postgres:5432/${DB_NAME:-insightgov}?schema=public
+
+      # NextAuth - SECURITY: Externalized secrets
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required - generate with: openssl rand -base64 32}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+
+      # AI
+      AI_PROVIDER: ${AI_PROVIDER:-groq}
+      GROQ_API_KEY: ${GROQ_API_KEY:?GROQ_API_KEY is required - get it from console.groq.com}
+      AI_MODEL: ${AI_MODEL:-llama-3.3-70b-versatile}
+
+      # App
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-InsightGov Africa}
+      NODE_ENV: ${NODE_ENV:-development}
+
+      # Security - Disable demo mode in production
+      DEMO_MODE_ENABLED: ${DEMO_MODE_ENABLED:-false}
+
+      # Payment - Paystack (optional for development)
+      PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
+      PAYSTACK_PUBLIC_KEY: ${PAYSTACK_PUBLIC_KEY:-}
+
+      # Email - Resend (optional for development)
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-noreply@insightgov.africa}
+
+      # Monitoring - Sentry (optional)
+      SENTRY_DSN: ${SENTRY_DSN:-}
+
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    volumes:
+      - ./src:/app/src
+      - ./public:/app/public
+      - ./prisma:/app/prisma
+    networks:
+      - insightgov-network
+
+  # Adminer - Database Management UI (Optional - for development only)
+  adminer:
+    image: adminer:latest
+    container_name: insightgov-adminer
+    restart: unless-stopped
+    ports:
+      - "${ADMINER_PORT:-8080}:8080"
+    depends_on:
+      - postgres
+    networks:
+      - insightgov-network
+    profiles:
+      - admin  # Only start with: docker-compose --profile admin up
+
+networks:
+  insightgov-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
