@@ -1,27 +1,37 @@
 # =============================================================================
-# InsightGov Africa - Docker Compose for Local Development
+# InsightGov Africa - Docker Compose pour Développement
 # =============================================================================
 # Usage:
-#   docker-compose up -d        # Start all services
-#   docker-compose down         # Stop all services
-#   docker-compose logs -f app  # View app logs
-#   docker-compose restart app  # Restart app only
+#   docker-compose up -d              # Démarrer tous les services
+#   docker-compose down               # Arrêter tous les services
+#   docker-compose logs -f app        # Voir les logs de l'app
+#   docker-compose restart app        # Redémarrer l'app
+#   docker-compose --profile admin up # Démarrer avec Adminer
 #
-# SECURITY: All secrets are now externalized to .env file
-# Create a .env file from .env.example before running
+# Services inclus:
+#   - PostgreSQL: Base de données principale
+#   - Redis: Cache et sessions
+#   - Nginx: Reverse proxy (optionnel en dev)
+#   - App: Application Next.js
+#   - Adminer: UI de gestion DB (optionnel)
+#
+# SÉCURITÉ: Tous les secrets sont externalisés vers .env
 # =============================================================================
 
 services:
-  # PostgreSQL Database
+  # ===========================================================================
+  # POSTGRESQL - Base de données principale
+  # ===========================================================================
   postgres:
     image: postgres:16-alpine
     container_name: insightgov-db
     restart: unless-stopped
     environment:
-      # SECURITY: Using environment variables instead of hardcoded values
       POSTGRES_USER: ${DB_USER:-insightgov}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required - set it in .env file}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD requis - définir dans .env}
       POSTGRES_DB: ${DB_NAME:-insightgov}
+      # Optimisations PostgreSQL pour le développement
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
@@ -35,8 +45,40 @@ services:
       start_period: 10s
     networks:
       - insightgov-network
+    # Resource limits pour le développement
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
-  # Next.js Application
+  # ===========================================================================
+  # REDIS - Cache et Sessions
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: insightgov-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - insightgov-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # ===========================================================================
+  # NEXT.JS APPLICATION
+  # ===========================================================================
   app:
     build:
       context: .
@@ -46,48 +88,108 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
-      # Database - SECURITY: Using environment variables
-      DATABASE_URL: postgresql://${DB_USER:-insightgov}:${DB_PASSWORD:?DB_PASSWORD is required}@postgres:5432/${DB_NAME:-insightgov}?schema=public
+      # Base de données
+      DATABASE_URL: postgresql://${DB_USER:-insightgov}:${DB_PASSWORD:?DB_PASSWORD requis}@postgres:5432/${DB_NAME:-insightgov}?schema=public
 
-      # NextAuth - SECURITY: Externalized secrets
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required - generate with: openssl rand -base64 32}
+      # Redis pour le cache
+      REDIS_URL: redis://redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+      # NextAuth
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?NEXTAUTH_SECRET requis - générer avec: openssl rand -base64 32}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
 
-      # AI
+      # IA
       AI_PROVIDER: ${AI_PROVIDER:-groq}
-      GROQ_API_KEY: ${GROQ_API_KEY:?GROQ_API_KEY is required - get it from console.groq.com}
+      GROQ_API_KEY: ${GROQ_API_KEY:?GROQ_API_KEY requis - obtenir sur console.groq.com}
       AI_MODEL: ${AI_MODEL:-llama-3.3-70b-versatile}
 
-      # App
+      # Application
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
       NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-InsightGov Africa}
-      NODE_ENV: ${NODE_ENV:-development}
+      NODE_ENV: development
 
-      # Security - Disable demo mode in production
-      DEMO_MODE_ENABLED: ${DEMO_MODE_ENABLED:-false}
+      # Paiements - Orange Money (Guinée)
+      ORANGE_MONEY_API_KEY: ${ORANGE_MONEY_API_KEY:-}
+      ORANGE_MONEY_API_SECRET: ${ORANGE_MONEY_API_SECRET:-}
+      ORANGE_MONEY_MERCHANT_CODE: ${ORANGE_MONEY_MERCHANT_CODE:-}
+      ORANGE_MONEY_WEBHOOK_SECRET: ${ORANGE_MONEY_WEBHOOK_SECRET:-}
+      ORANGE_MONEY_ENVIRONMENT: ${ORANGE_MONEY_ENVIRONMENT:-sandbox}
 
-      # Payment - Paystack (optional for development)
+      # Paiements - MTN Money (Guinée)
+      MTN_MONEY_API_KEY: ${MTN_MONEY_API_KEY:-}
+      MTN_MONEY_API_SECRET: ${MTN_MONEY_API_SECRET:-}
+      MTN_MONEY_MERCHANT_CODE: ${MTN_MONEY_MERCHANT_CODE:-}
+      MTN_MONEY_WEBHOOK_SECRET: ${MTN_MONEY_WEBHOOK_SECRET:-}
+      MTN_MONEY_ENVIRONMENT: ${MTN_MONEY_ENVIRONMENT:-sandbox}
+
+      # Paystack (Paiements alternatifs)
       PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
       PAYSTACK_PUBLIC_KEY: ${PAYSTACK_PUBLIC_KEY:-}
 
-      # Email - Resend (optional for development)
+      # Email - Resend
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM: ${EMAIL_FROM:-noreply@insightgov.africa}
 
-      # Monitoring - Sentry (optional)
+      # SMS - Africa's Talking
+      AFRICAS_TALKING_API_KEY: ${AFRICAS_TALKING_API_KEY:-}
+      AFRICAS_TALKING_USERNAME: ${AFRICAS_TALKING_USERNAME:-sandbox}
+
+      # Monitoring - Sentry
       SENTRY_DSN: ${SENTRY_DSN:-}
+
+      # Mode démo (désactivé en production)
+      DEMO_MODE_ENABLED: ${DEMO_MODE_ENABLED:-false}
 
     ports:
       - "${APP_PORT:-3000}:3000"
     volumes:
+      # Montage du code source pour hot reload
       - ./src:/app/src
       - ./public:/app/public
       - ./prisma:/app/prisma
+      - ./next.config.ts:/app/next.config.ts
+      - ./tailwind.config.ts:/app/tailwind.config.ts
+      - ./tsconfig.json:/app/tsconfig.json
+      # Exclure node_modules du montage
+      - /app/node_modules
+      - /app/.next
     networks:
       - insightgov-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
-  # Adminer - Database Management UI (Optional - for development only)
+  # ===========================================================================
+  # NGINX - Reverse Proxy (Optionnel en développement)
+  # ===========================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: insightgov-nginx
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "${NGINX_PORT:-80}:80"
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - insightgov-network
+    profiles:
+      - proxy  # Démarrer avec: docker-compose --profile proxy up
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  # ===========================================================================
+  # ADMINER - UI de gestion de base de données (Développement uniquement)
+  # ===========================================================================
   adminer:
     image: adminer:latest
     container_name: insightgov-adminer
@@ -99,11 +201,47 @@ services:
     networks:
       - insightgov-network
     profiles:
-      - admin  # Only start with: docker-compose --profile admin up
+      - admin  # Démarrer avec: docker-compose --profile admin up
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
+  # ===========================================================================
+  # REDIS INSIGHT - UI de gestion Redis (Développement uniquement)
+  # ===========================================================================
+  redis-insight:
+    image: redis/redisinsight:latest
+    container_name: insightgov-redis-insight
+    restart: unless-stopped
+    ports:
+      - "${REDIS_INSIGHT_PORT:-5540}:5540"
+    depends_on:
+      - redis
+    networks:
+      - insightgov-network
+    profiles:
+      - admin  # Démarrer avec: docker-compose --profile admin up
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+# =============================================================================
+# RÉSEAUX
+# =============================================================================
 networks:
   insightgov-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
 
+# =============================================================================
+# VOLUMES PERSISTANTS
+# =============================================================================
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
+    driver: local

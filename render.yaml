@@ -1,79 +1,281 @@
 # =============================================================================
 # InsightGov Africa - Render Configuration (Production)
 # =============================================================================
-# Ce fichier configure le déploiement sur Render (render.com)
+# Configuration complète pour le déploiement sur Render (render.com)
+# Région: Frankfurt (le plus proche de l'Afrique de l'Ouest)
+#
+# Services:
+#   - Web Service (Next.js) avec autoscaling
+#   - PostgreSQL avec backups automatiques
+#   - Redis managé
+#   - Cron jobs pour les tâches planifiées
+#
+# Variables d'environnement:
+#   - Paiements: Orange Money, MTN Money, Paystack
+#   - Communication: Africa's Talking SMS, Resend Email
+#   - Monitoring: Sentry
 # =============================================================================
 
 services:
-  # Web Service - Application Next.js
+  # ===========================================================================
+  # WEB SERVICE - Application Next.js
+  # ===========================================================================
   - type: web
     name: insightgov-africa
     runtime: docker
-    region: frankfurt # Le plus proche de l'Afrique de l'Ouest
-    plan: starter # Gratuit pour commencer, upgrade vers 'standard' pour la prod
+    region: frankfurt
+    plan: standard  # Starter gratuit pour tests, puis standard pour prod
     branch: main
     dockerfilePath: ./Dockerfile
-    
-    # Auto-deploy on push to main
+    dockerContext: .
+
+    # Auto-déploiement sur push vers main
     autoDeploy: true
+
+    # Health check configuration
+    healthCheckPath: /api/health
+    healthCheckInterval: 30s
+    healthCheckTimeout: 10s
+
+    # Autoscaling configuration
+    numInstances:
+      min: 1
+      max: 3
 
     # Variables d'environnement
     envVars:
+      # =======================================================================
+      # ENVIRONNEMENT
+      # =======================================================================
       - key: NODE_ENV
         value: production
 
-      # PostgreSQL Database (connecté à la DB ci-dessous)
+      # =======================================================================
+      # BASE DE DONNÉES
+      # =======================================================================
       - key: DATABASE_URL
         fromDatabase:
           name: insightgov-db
           property: connectionString
 
-      # NextAuth.js
+      # =======================================================================
+      # REDIS
+      # =======================================================================
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: insightgov-redis
+          property: connectionString
+
+      # =======================================================================
+      # NEXTAUTH
+      # =======================================================================
       - key: NEXTAUTH_SECRET
-        generateValue: true # Génère automatiquement un secret sécurisé
+        generateValue: true
 
       - key: NEXTAUTH_URL
         value: https://insightgov-africa.onrender.com
 
-      # Groq AI
+      # =======================================================================
+      # IA - GROQ
+      # =======================================================================
       - key: AI_PROVIDER
         value: groq
 
       - key: GROQ_API_KEY
-        sync: false # À définir manuellement dans le dashboard
+        sync: false  # À définir manuellement dans le dashboard
 
       - key: AI_MODEL
         value: llama-3.3-70b-versatile
 
-      # Paystack (Paiements)
-      - key: PAYSTACK_SECRET_KEY
-        sync: false # À définir manuellement
-
-      - key: NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
-        sync: false # À définir manuellement
-
-      # App
+      # =======================================================================
+      # APPLICATION
+      # =======================================================================
       - key: NEXT_PUBLIC_APP_URL
         value: https://insightgov-africa.onrender.com
 
       - key: NEXT_PUBLIC_APP_NAME
         value: InsightGov Africa
 
-    # Health check
-    healthCheckPath: /api/health
+      # =======================================================================
+      # PAIEMENTS - ORANGE MONEY (GUINÉE)
+      # =======================================================================
+      - key: ORANGE_MONEY_API_KEY
+        sync: false
 
-    # Disk storage (for file uploads)
+      - key: ORANGE_MONEY_API_SECRET
+        sync: false
+
+      - key: ORANGE_MONEY_MERCHANT_CODE
+        sync: false
+
+      - key: ORANGE_MONEY_WEBHOOK_SECRET
+        sync: false
+
+      - key: ORANGE_MONEY_ENVIRONMENT
+        value: production
+
+      # =======================================================================
+      # PAIEMENTS - MTN MONEY (GUINÉE)
+      # =======================================================================
+      - key: MTN_MONEY_API_KEY
+        sync: false
+
+      - key: MTN_MONEY_API_SECRET
+        sync: false
+
+      - key: MTN_MONEY_MERCHANT_CODE
+        sync: false
+
+      - key: MTN_MONEY_WEBHOOK_SECRET
+        sync: false
+
+      - key: MTN_MONEY_ENVIRONMENT
+        value: production
+
+      # =======================================================================
+      # PAIEMENTS - PAYSTACK (INTERNATIONAL)
+      # =======================================================================
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+
+      - key: NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
+        sync: false
+
+      # =======================================================================
+      # EMAIL - RESEND
+      # =======================================================================
+      - key: RESEND_API_KEY
+        sync: false
+
+      - key: EMAIL_FROM
+        value: noreply@insightgov.africa
+
+      # =======================================================================
+      # SMS - AFRICA'S TALKING
+      # =======================================================================
+      - key: AFRICAS_TALKING_API_KEY
+        sync: false
+
+      - key: AFRICAS_TALKING_USERNAME
+        value: insightgov
+
+      # =======================================================================
+      # MONITORING - SENTRY
+      # =======================================================================
+      - key: SENTRY_DSN
+        sync: false
+
+      - key: SENTRY_ENVIRONMENT
+        value: production
+
+      # =======================================================================
+      # ADMIN INITIAL
+      # =======================================================================
+      - key: ADMIN_EMAIL
+        sync: false
+
+      - key: ADMIN_PASSWORD
+        sync: false
+
+    # Stockage persistant pour les uploads
     disk:
       name: uploads
       mountPath: /app/uploads
-      sizeGB: 1
+      sizeGB: 5
+
+  # ===========================================================================
+  # CRON JOB - Nettoyage des sessions expirées
+  # ===========================================================================
+  - type: cron
+    name: cleanup-sessions
+    runtime: docker
+    region: frankfurt
+    plan: starter
+    schedule: "0 3 * * *"  # Tous les jours à 3h UTC
+    dockerfilePath: ./Dockerfile
+    buildFilter:
+      paths:
+        - prisma/**
+    dockerCommand: npx prisma db execute --file=./prisma/cleanup-sessions.sql
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: insightgov-db
+          property: connectionString
+
+  # ===========================================================================
+  # CRON JOB - Rapports automatiques
+  # ===========================================================================
+  - type: cron
+    name: daily-reports
+    runtime: docker
+    region: frankfurt
+    plan: starter
+    schedule: "0 6 * * *"  # Tous les jours à 6h UTC
+    dockerfilePath: ./Dockerfile
+    dockerCommand: node scripts/generate-daily-reports.js
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: insightgov-db
+          property: connectionString
+      - key: RESEND_API_KEY
+        sync: false
+
+  # ===========================================================================
+  # CRON JOB - Backup automatique (si pas de managed backup)
+  # ===========================================================================
+  - type: cron
+    name: daily-backup
+    runtime: docker
+    region: frankfurt
+    plan: starter
+    schedule: "0 2 * * *"  # Tous les jours à 2h UTC
+    dockerfilePath: ./Dockerfile
+    dockerCommand: node scripts/backup.js
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: insightgov-db
+          property: connectionString
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_BUCKET
+        value: insightgov-backups
 
 # =============================================================================
-# BASE DE DONNÉES PostgreSQL
+# BASE DE DONNÉES POSTGRESQL
 # =============================================================================
 databases:
   - name: insightgov-db
     databaseName: insightgov
     user: insightgov
     region: frankfurt
-    plan: starter # Gratuit (limité à 90 jours), puis $7/mois
+    plan: standard  # Starter gratuit (90 jours), puis standard ($7/mois)
+
+    # Configuration PostgreSQL
+    postgresMajorVersion: 16
+
+    # Backups automatiques
+    highAvailability:
+      enabled: false  # Activer pour la production critique
+
+    # IP Allowlist (optionnel - pour restreindre l'accès)
+    # ipAllowList:
+    #   - source: 0.0.0.0/0
+    #     description: Allow all (à restreindre en production)
+
+# =============================================================================
+# REDIS MANAGÉ
+# =============================================================================
+  - type: redis
+    name: insightgov-redis
+    region: frankfurt
+    plan: starter  # Gratuit, puis standard pour la prod
+    maxmemoryPolicy: allkeys-lru
+
+    # Persistant Redis
+    # Le plan starter inclut la persistance automatique

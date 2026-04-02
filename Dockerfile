@@ -1,89 +1,142 @@
 # =============================================================================
-# InsightGov Africa - Production Dockerfile
+# InsightGov Africa - Production Dockerfile (Multi-stage Optimisé)
 # =============================================================================
-# Multi-stage build optimisé pour la production avec Prisma
+# Support ARM64 (Apple Silicon) et AMD64 (x86_64)
+# Security hardening avec non-root user
+# Cache optimisé pour les layers Docker
 # =============================================================================
 
-# Stage 1: Dependencies
-FROM oven/bun:1 AS deps
-WORKDIR /app
+# Étape 1: Dépendances de base
+FROM node:20-alpine AS base
 
-# Install OpenSSL for Prisma
-RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
-
-# Copy package files
-COPY package.json bun.lock* ./
-COPY prisma ./prisma/
-
-# Install dependencies and generate Prisma client
-RUN bun install --frozen-lockfile
-RUN bunx prisma generate
-
-# Stage 2: Builder
-FROM oven/bun:1 AS builder
-WORKDIR /app
-
-# Install OpenSSL for Prisma
-RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
-
-# Copy dependencies
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-
-# Set environment variables for build
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV NODE_ENV=production
-
-# Build the application
-RUN bun run build
-
-# Stage 3: Runner
-FROM oven/bun:1 AS runner
-WORKDIR /app
-
-# Install OpenSSL for Prisma runtime and curl for health checks
-RUN apt-get update && apt-get install -y \
+# Installer les dépendances système essentielles
+# OpenSSL: requis pour Prisma
+# curl: pour les health checks
+RUN apk add --no-cache \
     openssl \
     curl \
-    && rm -rf /var/lib/apt/lists/*
+    libc6-compat \
+    && rm -rf /var/cache/apk/*
 
+# =============================================================================
+# Étape 2: Installation des dépendances (avec cache)
+FROM base AS deps
+
+WORKDIR /app
+
+# Copier les fichiers de dépendances en premier (meilleur cache)
+COPY package.json package-lock.json* ./
+
+# Installer les dépendances avec npm
+# --legacy-peer-deps pour la compatibilité React 19
+RUN npm ci --legacy-peer-deps && \
+    npm cache clean --force
+
+# Copier le schéma Prisma et générer le client
+COPY prisma ./prisma/
+RUN npx prisma generate
+
+# =============================================================================
+# Étape 3: Build de l'application
+FROM base AS builder
+
+WORKDIR /app
+
+# Copier les dépendances installées
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=deps /app/node_modules/@prisma ./node_modules/@prisma
+
+# Copier le code source
+COPY . .
+
+# Variables d'environnement pour le build
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+ENV NEXT_BUILD_ID=production
+
+# Désactiver les analyses pendant le build
+ENV SKIP_ENV_VALIDATION=1
+
+# Build de l'application Next.js
+# standalone: crée un serveur autonome
+RUN npm run build
+
+# =============================================================================
+# Étape 4: Image de production minimale
+FROM base AS runner
+
+WORKDIR /app
+
+# Variables d'environnement de production
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Create non-root user for security
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# =============================================================================
+# SECURITY HARDENING
+# =============================================================================
 
-# Copy built application
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+# Créer un utilisateur non-root pour la sécurité
+# UID/GID 1001: standard pour les applications Node.js
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
 
-# Copy Prisma files for runtime
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder /app/prisma ./prisma
+# Créer les répertoires nécessaires avec les bonnes permissions
+RUN mkdir -p /app/.next /app/public /app/uploads /app/logs && \
+    chown -R nextjs:nodejs /app
 
-# Copy startup script
-COPY docker-start-production.sh ./
+# =============================================================================
+# COPIE DES FICHIERS DE PRODUCTION
+# =============================================================================
+
+# Copier les fichiers statiques publics
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+# Copier l'application standalone Next.js
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+
+# Copier les fichiers statiques générés
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Copier Prisma pour les migrations runtime
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+
+# Copier le script de démarrage
+COPY --chown=nextjs:nodejs docker-start-production.sh ./
 RUN chmod +x docker-start-production.sh
 
-# Set correct ownership
-RUN chown -R nextjs:nodejs /app
+# =============================================================================
+# CONFIGURATION RÉSEAU
+# =============================================================================
 
-# Switch to non-root user
-USER nextjs
-
-# Expose port
+# Exposer le port de l'application
 EXPOSE 3000
 
+# Variables de port
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+# =============================================================================
+# HEALTH CHECK
+# =============================================================================
+
+# Health check intégré pour Docker et orchestrateurs
+# Intervalle: 30s entre les checks
+# Timeout: 10s pour répondre
+# Start period: 40s pour le démarrage initial
+# Retries: 3 avant de marquer unhealthy
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:3000/api/health || exit 1
 
-# Start the application with startup script
+# =============================================================================
+# DÉMARRAGE
+# =============================================================================
+
+# Passer à l'utilisateur non-root
+USER nextjs
+
+# Démarrer l'application avec le script de démarrage
 CMD ["./docker-start-production.sh"]

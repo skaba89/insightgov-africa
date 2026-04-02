@@ -1,51 +1,107 @@
 # =============================================================================
 # InsightGov Africa - Development Dockerfile
 # =============================================================================
-# Using Node.js for better Prisma compatibility
+# Image optimisée pour le développement avec:
+# - Hot reload pour les modifications de code
+# - Prisma intégré avec génération automatique
+# - Support ARM64 et AMD64
+# - Outils de développement inclus
 # =============================================================================
 
 FROM node:20-alpine
 
 WORKDIR /app
 
-# Install system dependencies (OpenSSL required for Prisma)
+# =============================================================================
+# DÉPENDANCES SYSTÈME
+# =============================================================================
+
+# Installer les outils nécessaires au développement
+# - openssl: requis pour Prisma
+# - curl: pour les health checks
+# - bash: pour les scripts
+# - git: pour les opérations git
+# - dos2unix: conversion des fins de ligne
 RUN apk add --no-cache \
     openssl \
-    libc6-compat \
     curl \
     bash \
-    dos2unix
+    git \
+    dos2unix \
+    libc6-compat \
+    && rm -rf /var/cache/apk/*
 
-# Copy package files first
-COPY package.json ./
+# =============================================================================
+# CONFIGURATION DE L'UTILISATEUR
+# =============================================================================
 
-# Copy prisma schema before install
-COPY prisma ./prisma/
+# Créer un utilisateur non-root (optionnel en développement)
+# Commenté pour simplifier le développement
+# RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# Install dependencies with npm (legacy-peer-deps for React 19 compatibility)
-RUN npm install --legacy-peer-deps
+# =============================================================================
+# VARIABLES D'ENVIRONNEMENT
+# =============================================================================
 
-# Generate Prisma client
-RUN npx prisma generate
-
-# Copy source code
-COPY . .
-
-# Copy startup script and convert line endings
-COPY docker-start.sh /app/start.sh
-RUN dos2unix /app/start.sh && chmod +x /app/start.sh
-
-# Expose port
-EXPOSE 3000
-
-# Set environment
 ENV NODE_ENV=development
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV WATCHPACK_POLLING=true
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+# =============================================================================
+# INSTALLATION DES DÉPENDANCES
+# =============================================================================
+
+# Copier les fichiers de dépendances
+COPY package.json package-lock.json* ./
+
+# Copier Prisma avant npm install (nécessaire pour postinstall)
+COPY prisma ./prisma/
+
+# Installer les dépendances
+# --legacy-peer-deps: pour la compatibilité React 19
+RUN npm install --legacy-peer-deps && \
+    npm cache clean --force
+
+# Générer le client Prisma
+RUN npx prisma generate
+
+# =============================================================================
+# COPIE DU CODE SOURCE
+# =============================================================================
+
+# Copier tout le code source
+# En mode développement, les volumes peuvent surcharger ces fichiers
+COPY . .
+
+# =============================================================================
+# SCRIPTS DE DÉMARRAGE
+# =============================================================================
+
+# Copier et préparer le script de démarrage
+COPY docker-start-local.sh /app/start-dev.sh
+RUN dos2unix /app/start-dev.sh && chmod +x /app/start-dev.sh
+
+# =============================================================================
+# RÉSEAU
+# =============================================================================
+
+# Exposer le port de développement
+EXPOSE 3000
+
+# =============================================================================
+# HEALTH CHECK
+# =============================================================================
+
+# Health check pour le développement
+# Plus tolérant que la production
+HEALTHCHECK --interval=30s --timeout=15s --start-period=60s --retries=5 \
     CMD curl -f http://localhost:3000/api/health || exit 1
 
-# Start with initialization script
-CMD ["/bin/bash", "/app/start.sh"]
+# =============================================================================
+# POINT D'ENTRÉE
+# =============================================================================
+
+# Utiliser le script de démarrage local
+CMD ["/bin/bash", "/app/start-dev.sh"]

@@ -310,6 +310,48 @@ Task: Créer les pages UI pour le module Business/Commerce
 - Filtres avancés
 
 ---
+## Task ID: 5 - Configuration Docker & Render
+Agent: DevOps Agent
+Task: Configurer Docker et Render pour un déploiement scalable
+
+### Work Summary
+
+#### Configuration Docker
+1. `Dockerfile` - Multi-stage optimisé (base, deps, builder, runner)
+2. `Dockerfile.dev` - Image développement avec hot reload
+3. `docker-compose.yml` - Dev avec Redis, Nginx, Adminer
+4. `docker-compose.prod.yml` - Production avec SSL, backups
+5. `.dockerignore` - Exclusion des fichiers inutiles
+
+#### Configuration Nginx
+1. `nginx/nginx.conf` - Reverse proxy production (SSL, rate limiting)
+2. `nginx/nginx.dev.conf` - Configuration développement
+3. `nginx/Dockerfile` - Image Nginx custom
+4. `nginx/html/429.html` - Page erreur rate limiting
+5. `nginx/html/50x.html` - Page erreur serveur
+
+#### Configuration Render
+1. `render.yaml` - Web service, PostgreSQL 16, Redis, Cron jobs
+2. Variables Orange Money et MTN Money configurées
+3. Autoscaling 1-3 instances
+4. Backups automatiques
+
+#### Scripts
+1. `scripts/deploy.sh` - Déploiement automatisé avec rollback
+2. `scripts/backup.sh` - Backup PostgreSQL avec S3
+
+#### CI/CD
+1. `.github/workflows/docker.yml` - Build Docker multi-arch
+
+#### Documentation
+1. `docs/DEPLOYMENT_GUIDE.md` - Guide complet de déploiement
+
+### Architecture
+```
+Nginx (SSL) → App (1-3 instances) → PostgreSQL + Redis
+```
+
+---
 ## Task ID: 2 - UI Business/Commerce
 Agent: UI Developer Agent
 Task: Créer les pages UI pour le module Business/Commerce
@@ -405,3 +447,176 @@ Fichier: `/home/z/my-project/src/components/orders/order-table.tsx`
 7. `src/components/business/business-form.tsx` - Composant formulaire business
 8. `src/components/products/product-table.tsx` - Composant tableau produits
 9. `src/components/orders/order-table.tsx` - Composant tableau commandes
+
+---
+## Task ID: 1, 2, 3 - Configuration Docker & Render
+Agent: DevOps Agent
+Task: Améliorer la configuration Docker et Render pour un déploiement scalable
+
+### Work Summary
+
+#### 1. Dockerfile (Amélioré)
+Fichier: `/home/z/my-project/Dockerfile`
+- Multi-stage build optimisé (base, deps, builder, runner)
+- Support ARM64 (Apple Silicon) et AMD64 (x86_64)
+- Cache optimisé pour les layers Docker
+- Security hardening avec utilisateur non-root (UID/GID 1001)
+- Health check intégré (30s interval, 40s start period)
+- Image Node.js 20 Alpine minimale
+
+#### 2. Dockerfile.dev (Amélioré)
+Fichier: `/home/z/my-project/Dockerfile.dev`
+- Image de développement avec hot reload
+- Support WATCHPACK_POLLING pour le rechargement
+- Outils de développement inclus (git, bash, curl)
+- Prisma intégré avec génération automatique
+- Health check tolérant (60s start period)
+
+#### 3. docker-compose.yml (Amélioré)
+Fichier: `/home/z/my-project/docker-compose.yml`
+- PostgreSQL 16 Alpine avec health checks
+- **Redis 7 Alpine** pour le cache et sessions
+- Nginx comme reverse proxy (optionnel, profile: proxy)
+- Adminer pour gestion DB (optionnel, profile: admin)
+- Redis Insight pour gestion Redis (optionnel)
+- Variables d'environnement Orange Money et MTN Money
+- Network isolation avec sous-réseau dédié
+
+#### 4. docker-compose.prod.yml (Créé)
+Fichier: `/home/z/my-project/docker-compose.prod.yml`
+- Configuration production complète
+- PostgreSQL avec configuration optimisée
+- Redis persistant avec mot de passe
+- Nginx avec SSL/TLS
+- Service de backup automatique
+- Resource limits pour chaque service
+- Restart policies avec backoff
+- Security hardening (no-new-privileges, read-only)
+- Support multi-instances (scalable)
+
+#### 5. nginx/nginx.conf (Créé)
+Fichier: `/home/z/my-project/nginx/nginx.conf`
+- Reverse proxy optimisé pour Next.js
+- SSL/TLS configuration (TLS 1.2/1.3)
+- Rate limiting par zone (general, api, auth, webhooks)
+- Gzip compression pour tous les types MIME
+- Cache headers optimisés (1 an pour static, 5s pour API)
+- WebSocket support (Socket.io)
+- Security headers (HSTS, CSP, X-Frame-Options)
+- Endpoints spéciaux pour webhooks Orange/MTN Money
+
+#### 6. nginx/Dockerfile (Créé)
+Fichier: `/home/z/my-project/nginx/Dockerfile`
+- Image Nginx Alpine custom
+- Certificat auto-signé pour démarrage initial
+- Pages d'erreur personnalisées intégrées
+- Health check intégré
+
+#### 7. render.yaml (Amélioré)
+Fichier: `/home/z/my-project/render.yaml`
+- Web service avec autoscaling (1-3 instances)
+- PostgreSQL 16 avec backups automatiques
+- Redis managé
+- **Variables Orange Money**: API_KEY, API_SECRET, MERCHANT_CODE, WEBHOOK_SECRET
+- **Variables MTN Money**: API_KEY, API_SECRET, MERCHANT_CODE, WEBHOOK_SECRET
+- Cron jobs pour nettoyage sessions, rapports, backup
+- Health check sur /api/health
+- Stockage persistant 5GB
+
+#### 8. scripts/deploy.sh (Créé)
+Fichier: `/home/z/my-project/scripts/deploy.sh`
+- Script de déploiement automatisé complet
+- Support multi-environnement (dev, staging, prod)
+- Actions: build, push, deploy, all, rollback, migrate
+- Build multi-architecture (AMD64, ARM64)
+- Health check post-déploiement
+- Rollback vers version précédente
+
+#### 9. scripts/backup.sh (Créé)
+Fichier: `/home/z/my-project/scripts/backup.sh`
+- Backup complet PostgreSQL avec pg_dump
+- Support upload S3
+- Restauration depuis backup
+- Nettoyage automatique des vieux backups
+- Configuration cron pour backups automatiques
+- Rétention configurable (défaut: 30 jours)
+
+#### 10. docker-start-production.sh (Amélioré)
+Fichier: `/home/z/my-project/docker-start-production.sh`
+- Attente base de données avec retry
+- Migrations automatiques (prisma migrate deploy)
+- Seed initial si ADMIN_EMAIL défini
+- Vérification variables d'environnement critiques
+- Health check interne
+- Gestion signaux SIGTERM/SIGINT pour arrêt propre
+- Logging coloré et détaillé
+
+#### 11. .dockerignore (Créé)
+Fichier: `/home/z/my-project/.dockerignore`
+- Exclusion node_modules, .next, builds
+- Exclusion fichiers de développement
+- Exclusion tests et documentation
+- Optimisation taille image Docker
+
+### Architecture Déploiement
+
+```
+                    ┌─────────────┐
+                    │   Nginx     │ (SSL, Rate Limiting)
+                    │   :443      │
+                    └──────┬──────┘
+                           │
+              ┌────────────┼────────────┐
+              │            │            │
+        ┌─────▼─────┐ ┌────▼────┐ ┌────▼────┐
+        │  App #1   │ │ App #2  │ │ App #3  │
+        │  :3000    │ │ :3000   │ │ :3000   │
+        └─────┬─────┘ └────┬────┘ └────┬────┘
+              │            │            │
+              └────────────┼────────────┘
+                           │
+              ┌────────────┴────────────┐
+              │                         │
+        ┌─────▼─────┐            ┌──────▼──────┐
+        │ PostgreSQL│            │    Redis    │
+        │   :5432   │            │    :6379    │
+        └───────────┘            └─────────────┘
+```
+
+### Variables d'Environnement Mobile Money
+
+**Orange Money Guinée:**
+```env
+ORANGE_MONEY_API_KEY=xxx
+ORANGE_MONEY_API_SECRET=xxx
+ORANGE_MONEY_MERCHANT_CODE=xxx
+ORANGE_MONEY_WEBHOOK_SECRET=xxx
+ORANGE_MONEY_ENVIRONMENT=production
+```
+
+**MTN Money Guinée:**
+```env
+MTN_MONEY_API_KEY=xxx
+MTN_MONEY_API_SECRET=xxx
+MTN_MONEY_MERCHANT_CODE=xxx
+MTN_MONEY_WEBHOOK_SECRET=xxx
+MTN_MONEY_ENVIRONMENT=production
+```
+
+### Fichiers créés/modifiés
+1. `Dockerfile` - Amélioré multi-stage
+2. `Dockerfile.dev` - Amélioré hot reload
+3. `docker-compose.yml` - Ajout Redis, Nginx
+4. `docker-compose.prod.yml` - NOUVEAU
+5. `nginx/nginx.conf` - NOUVEAU
+6. `nginx/nginx.dev.conf` - NOUVEAU
+7. `nginx/Dockerfile` - NOUVEAU
+8. `nginx/html/429.html` - NOUVEAU
+9. `nginx/html/50x.html` - NOUVEAU
+10. `render.yaml` - Amélioré autoscaling
+11. `scripts/deploy.sh` - NOUVEAU
+12. `scripts/backup.sh` - NOUVEAU
+13. `.dockerignore` - NOUVEAU
+14. `docker-start-production.sh` - Amélioré
+15. `docker/postgres/postgresql.conf` - NOUVEAU
+16. `docker/postgres/init-replication.sh` - NOUVEAU
