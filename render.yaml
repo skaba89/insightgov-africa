@@ -33,7 +33,7 @@ services:
     autoDeploy: true
 
     # Health check configuration
-    healthCheckPath: /api/health
+    healthCheckPath: /api/health/ready
     healthCheckInterval: 30s
     healthCheckTimeout: 10s
 

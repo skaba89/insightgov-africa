@@ -136,12 +136,13 @@ ENV HOSTNAME="0.0.0.0"
 # =============================================================================
 
 # Health check intégré pour Docker et orchestrateurs
+# Utilise le endpoint liveness probe léger pour des checks rapides
 # Intervalle: 30s entre les checks
 # Timeout: 10s pour répondre
-# Start period: 40s pour le démarrage initial
+# Start period: 60s pour le démarrage initial (inclut migrations DB)
 # Retries: 3 avant de marquer unhealthy
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:3000/api/health || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:3000/api/health/live || exit 1
 
 # =============================================================================
 # DÉMARRAGE
