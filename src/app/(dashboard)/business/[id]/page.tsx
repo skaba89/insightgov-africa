@@ -574,7 +574,18 @@ export default function BusinessDetailPage({ params }: { params: Promise<{ id: s
         isOpen={showEditForm}
         onClose={() => setShowEditForm(false)}
         onSubmit={handleEditBusiness}
-        initialData={business}
+        initialData={business ? {
+          ...business,
+          phone2: business.phone2 ?? undefined,
+          email: business.email ?? undefined,
+          website: business.website ?? undefined,
+          region: business.region ?? undefined,
+          prefecture: business.prefecture ?? undefined,
+          address: business.address ?? undefined,
+          category: business.category ?? undefined,
+          nif: business.nif ?? undefined,
+          rccm: business.rccm ?? undefined,
+        } as Partial<BusinessFormData> : undefined}
         mode="edit"
       />
     </div>
