@@ -95,18 +95,45 @@ model Organization {
 /// Utilisateur de la plateforme
 model User {
   id                       String    @id @default(cuid())
-  email                    String    @unique
+  
+  // Identifiants
+  email                    String?   @unique
+  phone                    String?   @unique  // Pour auth Guinée (Mobile Money)
   emailVerified            DateTime?
+  phoneVerified            DateTime?
+  
+  // Profile
   firstName                String?
   lastName                 String?
   password                 String?   // Hashed password for credentials auth
   avatarUrl                String?
+  
+  // Langue et localisation
+  language                 String    @default("fr")  // fr, sou, ful, man, en
+  timezone                 String    @default("Africa/Conakry")
+  currency                 String    @default("GNF")  // Devise préférée
+  
+  // Organisation
   organizationId           String?
   role                     String    @default("viewer") // 'owner' | 'admin' | 'analyst' | 'viewer'
   isActive                 Boolean   @default(true)
+  
+  // Auth
   lastLoginAt              DateTime?
+  lastLoginIp              String?
   verificationToken        String?   // For email verification
   verificationTokenExpiry  DateTime? // Expiry for verification token
+  pinCode                  String?   // Code PIN pour auth mobile (4-6 chiffres)
+  pinCodeSetAt             DateTime?
+  
+  // KYC (Know Your Customer)
+  idType                   String?   // cni, passport, carte_electeur
+  idNumber                 String?
+  idDocumentUrl            String?
+  selfieUrl                String?
+  kycStatus                String    @default("none")  // none, pending, verified, rejected
+  kycVerifiedAt            DateTime?
+  
   createdAt                DateTime  @default(now())
   updatedAt                DateTime  @updatedAt
 
@@ -121,6 +148,11 @@ model User {
   notifications     Notification[]
   activityLogs      ActivityLog[]
   invoices          Invoice[]
+  
+  // Guinée Digital Suite
+  wallet            Wallet?
+  transactions      Transaction[]
+  businesses        Business[]
 
   @@index([email])
   @@index([organizationId])
@@ -973,6 +1005,522 @@ model ClientBranding {
 
   @@index([organizationId])
   @@index([customDomain])
+}
+
+// =============================================================================
+// GUINÉE DIGITAL SUITE - PAIEMENTS & WALLET
+// =============================================================================
+
+/// Portefeuille électronique utilisateur
+model Wallet {
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId    String?
+  
+  // Soldes
+  balanceGnf        Float     @default(0)     // Franc Guinéen
+  balanceUsd        Float     @default(0)     // Dollar US
+  balanceEur        Float     @default(0)     // Euro
+  
+  // Limites
+  dailyLimit        Float     @default(1000000)   // GNF
+  monthlyLimit      Float     @default(10000000)  // GNF
+  currentDaily      Float     @default(0)
+  currentMonthly    Float     @default(0)
+  
+  // Statut
+  isActive          Boolean   @default(true)
+  frozenAt          DateTime?
+  frozenReason      String?
+  kycLevel          String    @default("basic")  // basic, intermediate, advanced
+  
+  // Relations
+  transactions      Transaction[]
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([userId])
+  @@index([organizationId])
+}
+
+/// Transaction de paiement
+model Transaction {
+  id                String    @id @default(cuid())
+  reference         String    @unique
+  
+  // Participants
+  userId            String
+  user              User      @relation(fields: [userId], references: [id])
+  walletId          String
+  wallet            Wallet    @relation(fields: [walletId], references: [id])
+  organizationId    String?
+  
+  // Destinataire
+  recipientPhone    String?
+  recipientName     String?
+  recipientBank     String?
+  recipientAccount  String?
+  
+  // Montant
+  amount            Float
+  currency          String    @default("GNF")
+  fee               Float     @default(0)
+  tax               Float     @default(0)
+  total             Float
+  
+  // Type de transaction
+  type              String    // deposit, withdraw, transfer, payment, refund, airtime
+  category          String?   // airtime, electricity, water, tax, merchant, transfer
+  
+  // Provider Mobile Money
+  provider          String?   // orange, mtn, bank, cash, wave
+  providerRef       String?
+  providerStatus    String?
+  
+  // Statut
+  status            String    @default("pending")  // pending, processing, success, failed, cancelled
+  failureReason     String?
+  failureCode       String?
+  
+  // Métadonnées
+  description       String?
+  metadata          Json?
+  
+  // Sécurité
+  ipAddress         String?
+  userAgent         String?
+  deviceId          String?
+  
+  // Dates
+  processedAt       DateTime?
+  expiresAt         DateTime?
+  reconciledAt      DateTime?
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([userId])
+  @@index([reference])
+  @@index([status])
+  @@index([type])
+  @@index([provider])
+  @@index([createdAt])
+}
+
+/// Service de paiement disponible
+model PaymentService {
+  id                String    @id @default(cuid())
+  name              String
+  code              String    @unique
+  category          String    // utility, telecom, government, merchant, banking
+  
+  // Configuration
+  provider          String    // orange, mtn, internal, bank
+  accountNumber     String?
+  accountName       String?
+  
+  // Frais
+  feePercent        Float     @default(0)
+  feeFixed          Float     @default(0)
+  
+  // Limites
+  minAmount         Float     @default(100)
+  maxAmount         Float     @default(10000000)
+  
+  // Paramètres
+  isActive          Boolean   @default(true)
+  requiresKyc       Boolean   @default(false)
+  processingTime    Int       @default(0)  // minutes
+  
+  // Affichage
+  icon              String?
+  description       String?
+  instructions      String?
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([category])
+  @@index([isActive])
+}
+
+// =============================================================================
+// GUINÉE DIGITAL SUITE - BUSINESS & COMMERCE
+// =============================================================================
+
+/// Business/Commerce
+model Business {
+  id                String    @id @default(cuid())
+  organizationId    String?
+  ownerId           String
+  owner             User      @relation(fields: [ownerId], references: [id])
+  
+  name              String
+  slug              String    @unique
+  type              String    // shop, restaurant, service, wholesale, manufacturer
+  
+  // Localisation Guinée
+  region            String?   // Conakry, Kankan, N'Zérékoré, etc.
+  prefecture        String?
+  subPrefecture     String?
+  address           String?
+  gpsLat            Float?
+  gpsLng            Float?
+  
+  // Contact
+  phone             String
+  phone2            String?
+  email             String?
+  website           String?
+  
+  // Business
+  nif               String?   // Numéro d'Identification Fiscale
+  rccm              String?   // Registre du Commerce
+  category          String?
+  tags              String    @default("[]")  // JSON array
+  
+  // Horaires
+  openingHours      Json?
+  isOpen24h         Boolean   @default(false)
+  
+  // Configuration
+  currency          String    @default("GNF")
+  acceptMobileMoney Boolean   @default(true)
+  acceptCash        Boolean   @default(true)
+  acceptCard        Boolean   @default(false)
+  
+  // Statistiques
+  totalSales        Float     @default(0)
+  totalOrders       Int       @default(0)
+  totalCustomers    Int       @default(0)
+  rating            Float     @default(0)
+  reviewCount       Int       @default(0)
+  
+  // Statut
+  isActive          Boolean   @default(true)
+  isVerified        Boolean   @default(false)
+  verifiedAt        DateTime?
+  
+  // Relations
+  products          Product[]
+  orders            Order[]
+  invoices          BusinessInvoice[]
+  customers         Customer[]
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([ownerId])
+  @@index([region])
+  @@index([type])
+  @@index([category])
+  @@index([isActive])
+}
+
+/// Produit
+model Product {
+  id                String    @id @default(cuid())
+  businessId        String
+  business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  
+  name              String
+  slug              String?
+  description       String?
+  sku               String?
+  barcode           String?
+  category          String?
+  subCategory       String?
+  tags              String    @default("[]")  // JSON array
+  
+  // Prix
+  priceGnf          Float
+  priceUsd          Float?
+  costPrice         Float?    // Prix d'achat
+  wholesalePrice    Float?    // Prix gros
+  minWholesaleQty   Int?
+  
+  // Stock
+  quantity          Int       @default(0)
+  minQuantity       Int       @default(5)
+  maxQuantity       Int?
+  unit              String?   // kg, litre, pièce, etc.
+  
+  // Variantes
+  hasVariants       Boolean   @default(false)
+  variants          Json?     // Couleurs, tailles, etc.
+  
+  // Images
+  images            String    @default("[]")  // JSON array
+  mainImage         String?
+  
+  // SEO
+  metaTitle         String?
+  metaDescription   String?
+  
+  // Statut
+  isActive          Boolean   @default(true)
+  isFeatured        Boolean   @default(false)
+  isNew             Boolean   @default(false)
+  isOnSale          Boolean   @default(false)
+  
+  // Dates
+  availableFrom     DateTime?
+  availableUntil    DateTime?
+  
+  // Relations
+  orderItems        OrderItem[]
+  stockMovements    StockMovement[]
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@unique([businessId, sku])
+  @@index([businessId])
+  @@index([category])
+  @@index([isActive])
+}
+
+/// Mouvement de stock
+model StockMovement {
+  id                String    @id @default(cuid())
+  productId         String
+  product           Product   @relation(fields: [productId], references: [id])
+  
+  type              String    // in, out, adjustment, return
+  quantity          Int
+  previousStock     Int
+  newStock          Int
+  
+  reason            String?
+  reference         String?   // Numéro de commande, etc.
+  
+  cost              Float?
+  notes             String?
+  
+  createdBy         String?
+  createdAt         DateTime  @default(now())
+  
+  @@index([productId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+/// Commande
+model Order {
+  id                String    @id @default(cuid())
+  reference         String    @unique
+  
+  businessId        String
+  business          Business  @relation(fields: [businessId], references: [id])
+  customerId        String?
+  customer          Customer? @relation(fields: [customerId], references: [id])
+  
+  // Client (si pas enregistré)
+  customerPhone     String
+  customerName      String?
+  customerEmail     String?
+  customerAddress   String?
+  
+  // Détails
+  items             OrderItem[]
+  subtotal          Float
+  discount          Float     @default(0)
+  tax               Float     @default(0)
+  delivery          Float     @default(0)
+  total             Float
+  
+  // Devise
+  currency          String    @default("GNF")
+  
+  // Statut
+  status            String    @default("pending")  // pending, confirmed, preparing, ready, delivered, cancelled
+  paymentStatus     String    @default("pending")  // pending, paid, partial, failed, refunded
+  
+  // Paiement
+  paymentMethod     String?   // cash, orange_money, mtn_money, card
+  paymentRef        String?
+  paidAt            DateTime?
+  paymentAmount     Float?
+  
+  // Livraison
+  deliveryMethod    String?   // pickup, delivery, shipping
+  deliveryAddress   String?
+  deliveryNotes     String?
+  estimatedDelivery DateTime?
+  deliveredAt       DateTime?
+  deliveredBy       String?
+  
+  // Notes
+  notes             String?
+  internalNotes     String?
+  
+  // Source
+  source            String    @default("app")  // app, web, api, pos
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([businessId])
+  @@index([customerId])
+  @@index([customerPhone])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([createdAt])
+}
+
+/// Ligne de commande
+model OrderItem {
+  id                String    @id @default(cuid())
+  orderId           String
+  order             Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  productId         String
+  product           Product   @relation(fields: [productId], references: [id])
+  
+  productName       String    // Snapshot au moment de la commande
+  quantity          Float
+  unitPrice         Float
+  discount          Float     @default(0)
+  total             Float
+  
+  notes             String?
+  
+  createdAt         DateTime  @default(now())
+  
+  @@index([orderId])
+  @@index([productId])
+}
+
+/// Client
+model Customer {
+  id                String    @id @default(cuid())
+  businessId        String
+  business          Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  
+  // Identifiants
+  phone             String
+  email             String?
+  name              String?
+  
+  // Adresse
+  address           String?
+  region            String?
+  prefecture        String?
+  
+  // Statistiques
+  totalOrders       Int       @default(0)
+  totalSpent        Float     @default(0)
+  lastOrderAt       DateTime?
+  
+  // Segmentation
+  segment           String    @default("regular")  // new, regular, vip, inactive
+  
+  // Notes
+  notes             String?
+  
+  // Relations
+  orders            Order[]
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@unique([businessId, phone])
+  @@index([businessId])
+  @@index([phone])
+  @@index([segment])
+}
+
+/// Facture Business
+model BusinessInvoice {
+  id                String    @id @default(cuid())
+  invoiceNumber     String    @unique
+  
+  businessId        String
+  business          Business  @relation(fields: [businessId], references: [id])
+  orderId           String?
+  
+  // Client
+  clientName        String
+  clientPhone       String?
+  clientEmail       String?
+  clientAddress     String?
+  clientNif         String?
+  
+  // Détails
+  items             String    // JSON array
+  subtotal          Float
+  taxRate           Float     @default(0)
+  taxAmount         Float     @default(0)
+  discount          Float     @default(0)
+  total             Float
+  
+  // Devise
+  currency          String    @default("GNF")
+  
+  // Dates
+  issueDate         DateTime  @default(now())
+  dueDate           DateTime
+  paidAt            DateTime?
+  
+  // Statut
+  status            String    @default("draft")  // draft, sent, paid, overdue, cancelled
+  
+  // PDF
+  pdfUrl            String?
+  
+  // Notes
+  notes             String?
+  terms             String?
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([invoiceNumber])
+  @@index([businessId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+// =============================================================================
+// GUINÉE DIGITAL SUITE - RÉGIONS & LOCALISATION
+// =============================================================================
+
+/// Région administrative Guinée
+model GuineaRegion {
+  id                String    @id @default(cuid())
+  name              String
+  code              String    @unique
+  capital           String?
+  population        Int?
+  
+  prefectures       GuineaPrefecture[]
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([code])
+}
+
+/// Préfecture
+model GuineaPrefecture {
+  id                String    @id @default(cuid())
+  regionId          String
+  region            GuineaRegion @relation(fields: [regionId], references: [id])
+  
+  name              String
+  code              String    @unique
+  capital           String?
+  population        Int?
+  
+  subPrefectures    String    @default("[]")  // JSON array
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([regionId])
+  @@index([code])
 }
 
 // =============================================================================
