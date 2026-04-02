@@ -108,8 +108,8 @@ Sentry.init({
     /^\//,
     'insightgov.africa',
     /\.insightgov\.africa$/,
-    'api.paystack.co',
-    'api.openai.com',
+    'api.stripe.com',
+    'api.groq.com',
   ],
 
   // Before send hook for server events

@@ -54,7 +54,8 @@ export const sentryConfig = {
       mask: ['.sentry-mask'], // CSS selector for elements to mask
       networkDetailAllowUrls: [
         'api.insightgov.africa',
-        'api.paystack.co',
+        'api.stripe.com',
+        'api.groq.com',
       ],
       networkCaptureBodies: true,
       networkRequestHeaders: ['X-Request-Id', 'X-Correlation-Id'],
@@ -213,8 +214,8 @@ export const sentryConfig = {
     /^\//,
     'insightgov.africa',
     /\.insightgov\.africa$/,
-    'api.paystack.co',
-    'api.openai.com',
+    'api.stripe.com',
+    'api.groq.com',
   ],
 
   // Normalize depth

@@ -11,9 +11,9 @@
 #   - Cron jobs pour les tâches planifiées
 #
 # Variables d'environnement:
-#   - Paiements: Orange Money, MTN Money, Paystack
+#   - Paiements: Stripe (gratuit en mode test)
 #   - Communication: Africa's Talking SMS, Resend Email
-#   - Monitoring: Sentry
+#   - Monitoring: Sentry (gratuit)
 # =============================================================================
 
 services:
@@ -77,7 +77,7 @@ services:
         value: https://insightgov-africa.onrender.com
 
       # =======================================================================
-      # IA - GROQ
+      # IA - GROQ (GRATUIT)
       # =======================================================================
       - key: AI_PROVIDER
         value: groq
@@ -98,52 +98,58 @@ services:
         value: InsightGov Africa
 
       # =======================================================================
-      # PAIEMENTS - ORANGE MONEY (GUINÉE)
+      # PAIEMENTS - STRIPE (GRATUIT EN MODE TEST)
       # =======================================================================
-      - key: ORANGE_MONEY_API_KEY
-        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false  # Clé secrète Stripe (sk_test_... pour test)
 
-      - key: ORANGE_MONEY_API_SECRET
-        sync: false
+      - key: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+        sync: false  # Clé publique Stripe (pk_test_... pour test)
 
-      - key: ORANGE_MONEY_MERCHANT_CODE
-        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false  # Secret du webhook Stripe
 
-      - key: ORANGE_MONEY_WEBHOOK_SECRET
-        sync: false
-
-      - key: ORANGE_MONEY_ENVIRONMENT
-        value: production
+      - key: STRIPE_MODE
+        value: test  # "test" ou "live"
 
       # =======================================================================
-      # PAIEMENTS - MTN MONEY (GUINÉE)
+      # PAIEMENTS - ORANGE MONEY (À CONFIGURER PLUS TARD)
       # =======================================================================
-      - key: MTN_MONEY_API_KEY
-        sync: false
+      # - key: ORANGE_MONEY_API_KEY
+      #   sync: false
 
-      - key: MTN_MONEY_API_SECRET
-        sync: false
+      # - key: ORANGE_MONEY_API_SECRET
+      #   sync: false
 
-      - key: MTN_MONEY_MERCHANT_CODE
-        sync: false
+      # - key: ORANGE_MONEY_MERCHANT_CODE
+      #   sync: false
 
-      - key: MTN_MONEY_WEBHOOK_SECRET
-        sync: false
+      # - key: ORANGE_MONEY_WEBHOOK_SECRET
+      #   sync: false
 
-      - key: MTN_MONEY_ENVIRONMENT
-        value: production
-
-      # =======================================================================
-      # PAIEMENTS - PAYSTACK (INTERNATIONAL)
-      # =======================================================================
-      - key: PAYSTACK_SECRET_KEY
-        sync: false
-
-      - key: NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
-        sync: false
+      # - key: ORANGE_MONEY_ENVIRONMENT
+      #   value: production
 
       # =======================================================================
-      # EMAIL - RESEND
+      # PAIEMENTS - MTN MONEY (À CONFIGURER PLUS TARD)
+      # =======================================================================
+      # - key: MTN_MONEY_API_KEY
+      #   sync: false
+
+      # - key: MTN_MONEY_API_SECRET
+      #   sync: false
+
+      # - key: MTN_MONEY_MERCHANT_CODE
+      #   sync: false
+
+      # - key: MTN_MONEY_WEBHOOK_SECRET
+      #   sync: false
+
+      # - key: MTN_MONEY_ENVIRONMENT
+      #   value: production
+
+      # =======================================================================
+      # EMAIL - RESEND (GRATUIT - 3000 emails/mois)
       # =======================================================================
       - key: RESEND_API_KEY
         sync: false
@@ -161,13 +167,19 @@ services:
         value: insightgov
 
       # =======================================================================
-      # MONITORING - SENTRY
+      # MONITORING - SENTRY (GRATUIT - 5K événements/mois)
       # =======================================================================
       - key: SENTRY_DSN
-        sync: false
+        value: https://a1b2c3d4e5f6@o1234567.ingest.sentry.io/1234567
+
+      - key: NEXT_PUBLIC_SENTRY_DSN
+        value: https://a1b2c3d4e5f6@o1234567.ingest.sentry.io/1234567
 
       - key: SENTRY_ENVIRONMENT
         value: production
+
+      - key: SENTRY_RELEASE
+        value: 1.0.0
 
       # =======================================================================
       # ADMIN INITIAL
@@ -224,7 +236,7 @@ services:
         sync: false
 
   # ===========================================================================
-  # CRON JOB - Backup automatique (si pas de managed backup)
+  # CRON JOB - Backup automatique
   # ===========================================================================
   - type: cron
     name: daily-backup
@@ -263,11 +275,6 @@ databases:
     highAvailability:
       enabled: false  # Activer pour la production critique
 
-    # IP Allowlist (optionnel - pour restreindre l'accès)
-    # ipAllowList:
-    #   - source: 0.0.0.0/0
-    #     description: Allow all (à restreindre en production)
-
 # =============================================================================
 # REDIS MANAGÉ
 # =============================================================================
@@ -276,6 +283,3 @@ databases:
     region: frankfurt
     plan: starter  # Gratuit, puis standard pour la prod
     maxmemoryPolicy: allkeys-lru
-
-    # Persistant Redis
-    # Le plan starter inclut la persistance automatique

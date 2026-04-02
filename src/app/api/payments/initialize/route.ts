@@ -3,18 +3,18 @@
 // ============================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { paystackService, PRICING_PLANS } from '@/services/paystack';
+import { stripeService, PRICING_PLANS } from '@/services/stripe';
 import { db } from '@/lib/db';
 import { requireAuth } from '@/lib/auth-middleware';
 
 export async function POST(request: NextRequest) {
   // Vérifier l'authentification
   const authResult = await requireAuth(request, 'write');
-  
+
   if (authResult instanceof NextResponse) {
     return authResult;
   }
-  
+
   const auth = authResult.auth;
 
   try {
@@ -68,32 +68,26 @@ export async function POST(request: NextRequest) {
     // Générer une référence unique
     const reference = `igv_${organizationId.slice(0, 8)}_${Date.now()}`;
 
-    // Initialiser le paiement
-    const result = await paystackService.initializePayment({
+    // Créer une session de checkout Stripe
+    const result = await stripeService.createCheckoutSession({
       email,
       amount: planConfig.price,
-      currency: planConfig.currency,
-      reference,
+      currency: planConfig.currency.toLowerCase(),
+      productName: `InsightGov Africa - ${planConfig.name}`,
       metadata: {
         organizationId,
         plan,
         organizationName: organization.name,
         userId: auth.userId,
+        reference,
       },
     });
-
-    if (!result.status) {
-      return NextResponse.json(
-        { success: false, error: result.message },
-        { status: 400 }
-      );
-    }
 
     // Créer un enregistrement d'abonnement en attente
     await db.subscription.create({
       data: {
         organizationId,
-        paystackReference: reference,
+        paystackReference: reference, // Garder pour compatibilité
         status: 'PENDING',
         amount: planConfig.price,
         currency: planConfig.currency,
@@ -104,9 +98,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        authorizationUrl: result.data?.authorization_url,
-        reference: result.data?.reference,
-        accessCode: result.data?.access_code,
+        checkoutUrl: result.url,
+        sessionId: result.id,
+        reference,
       },
       metadata: {
         userId: auth.userId,
