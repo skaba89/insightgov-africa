@@ -29,6 +29,11 @@ COPY package.json bun.lock* ./
 # Copier le schéma Prisma
 COPY prisma ./prisma/
 
+# Utiliser le schéma PostgreSQL pour la production
+RUN if [ -f "./prisma/schema.postgresql.prisma" ]; then \
+    cp ./prisma/schema.postgresql.prisma ./prisma/schema.prisma; \
+    fi
+
 # Installer les dépendances avec Bun
 RUN bun install --frozen-lockfile
 
