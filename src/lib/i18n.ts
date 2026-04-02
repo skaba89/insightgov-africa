@@ -3,10 +3,20 @@
 // Support multi-langue (FR, EN, PT)
 // ============================================
 
-export const locales = ['fr', 'en', 'pt'] as const;
+export const locales = ['fr', 'en', 'pt', 'sou', 'ful', 'man'] as const;
 export type Locale = (typeof locales)[number];
 
 export const defaultLocale: Locale = 'fr';
+
+// ============================================
+// GUINÉE LOCAL LANGUAGES INFO
+// ============================================
+
+export const guineaLanguages = {
+  sou: { name: 'Soussou', nativeName: 'Soso', speakers: '2M+', regions: ['Conakry', 'Kindia', 'Boké'] },
+  ful: { name: 'Pular', nativeName: 'Fulfulde', speakers: '5M+', regions: ['Fouta Djallon', 'Labé', 'Mamou', 'Pita'] },
+  man: { name: 'Malinké', nativeName: 'Maninka', speakers: '4M+', regions: ['Kankan', 'Kouroussa', 'Siguiri', 'Mandiana'] },
+} as const;
 
 // ============================================
 // TRADUCTIONS
@@ -383,6 +393,297 @@ export const translations: Record<Locale, Record<string, string>> = {
     'common.edit': 'Editar',
     'common.search': 'Pesquisar',
   },
+
+  // ============================================
+  // SOUSSOU (Guinée Maritime)
+  // ============================================
+  sou: {
+    // Navigation
+    'nav.home': 'Ibulung',
+    'nav.dashboard': 'Tablo',
+    'nav.datasets': 'Data',
+    'nav.settings': 'Setin',
+    'nav.pricing': 'Pri',
+    'nav.login': 'Kone',
+    'nav.logout': 'Soti',
+    'nav.register': 'Inskri',
+
+    // Landing Page
+    'landing.hero.title': 'Tablo IA bongo Afrika',
+    'landing.hero.subtitle': 'Fini data mu bongo insi momu',
+    'landing.hero.cta': 'Kumene gratis',
+    'landing.hero.demo': 'Gaga demo',
+
+    'landing.features.title': 'Fonksion pisan',
+    'landing.features.subtitle': 'Suma mu bongo desisyon data',
+
+    'landing.features.ai.title': 'Analiz IA otomatik',
+    'landing.features.ai.desc': 'GPT-4o analize data mu yeke KPI bongo sekte',
+
+    'landing.features.upload.title': 'Impor fasil',
+    'landing.features.upload.desc': 'Upload CSV ka Excel, nu fin sa',
+
+    // Sectors
+    'landing.sectors.title': 'Bongo sekte',
+    'landing.sectors.health': 'Sante',
+    'landing.sectors.health.desc': 'Ministe, lopital, program sante',
+    'landing.sectors.education': 'Edikasyon',
+    'landing.sectors.education.desc': 'Ministe, lekol, universite',
+    'landing.sectors.agriculture': 'Agrikilti',
+    'landing.sectors.agriculture.desc': 'Ministe, kooperatif, proje rural',
+
+    // Pricing
+    'pricing.title': 'Naga plan',
+    'pricing.subtitle': 'Sulusyon bongo Ministere, ONG ka Entreprise Afrika',
+    'pricing.monthly': 'Mwa',
+    'pricing.annual': 'Lane',
+    'pricing.popular': 'P popular',
+    'pricing.choose': 'Naga plan sa',
+
+    'pricing.free.name': 'Gratis',
+    'pricing.starter.name': 'Starter',
+    'pricing.professional.name': 'Profesyonel',
+    'pricing.enterprise.name': 'Enterprise',
+
+    // Auth
+    'auth.login.title': 'Kone',
+    'auth.login.subtitle': 'Kone na espas InsightGov Africa',
+    'auth.login.email': 'Email',
+    'auth.login.password': 'Pasword',
+    'auth.login.forgot': 'Wele pasword?',
+    'auth.login.submit': 'Kone',
+
+    'auth.register.title': 'Kumene kont',
+    'auth.register.name': 'Non',
+    'auth.register.org': 'Non organisasyon',
+    'auth.register.submit': 'Kumene kont',
+
+    // Dashboard
+    'dashboard.welcome': 'Welkam',
+    'dashboard.upload.title': 'Impor data',
+    'dashboard.upload.drag': 'Drag ka drop fichier',
+    'dashboard.upload.browse': 'Navig',
+    'dashboard.upload.formats': 'Format: CSV, XLS, XLSX',
+
+    'dashboard.kpis.title': 'KPI',
+    'dashboard.charts.title': 'Grafik',
+    'dashboard.export.title': 'Ekspor',
+
+    // Wallet
+    'wallet.title': 'Poche',
+    'wallet.balance': 'Balans',
+    'wallet.deposit': 'Depo',
+    'wallet.withdraw': 'Retre',
+    'wallet.transfer': 'Transfe',
+    'wallet.transactions': 'Transaksyon',
+
+    // Common
+    'common.loading': 'Loading...',
+    'common.save': 'Sove',
+    'common.cancel': 'Anule',
+    'common.delete': 'Siprime',
+    'common.edit': 'Modifye',
+    'common.search': 'Sers',
+    'common.filter': 'Filt',
+    'common.all': 'Tusu',
+    'common.none': 'Ningin',
+    'common.yes': 'Iyo',
+    'common.no': 'Ali',
+  },
+
+  // ============================================
+  // PULAR / FULFULDE (Fouta Djallon)
+  // ============================================
+  ful: {
+    // Navigation
+    'nav.home': 'Saare',
+    'nav.dashboard': 'Tabloo',
+    'nav.datasets': 'Keɓe',
+    'nav.settings': 'Teeltagol',
+    'nav.pricing': 'Njoɓdi',
+    'nav.login': 'Naatir',
+    'nav.logout': 'Yaltir',
+    'nav.register': 'Winnditor',
+
+    // Landing Page
+    'landing.hero.title': 'Tabloo IA ngam Afrik',
+    'landing.hero.subtitle': 'Waylit keɓe maa en Insights e hojere',
+    'landing.hero.cta': 'Fuɗɗo e free',
+    'landing.hero.demo': 'Yiy demo',
+
+    'landing.features.title': 'Kuutorɗe ceeɓe',
+    'landing.features.subtitle': 'Ko fuu ɗaɓɓitanɗe ngam kuutoragol keɓe',
+
+    'landing.features.ai.title': 'Analiz IA',
+    'landing.features.ai.desc': 'GPT-4o analyzit keɓe maa e suggira KPI moƴƴuɗo',
+
+    'landing.features.upload.title': 'Naatnugol fummbe',
+    'landing.features.upload.desc': 'Upload CSV walla Excel, enen toppita',
+
+    // Sectors
+    'landing.sectors.title': 'Waɗii jowo sector',
+    'landing.sectors.health': 'Cellal',
+    'landing.sectors.health.desc': 'Minister, opitaal, program cellal',
+    'landing.sectors.education': 'Jaŋde',
+    'landing.sectors.education.desc': 'Minister, lekki, jaŋde',
+    'landing.sectors.agriculture': 'Demal',
+    'landing.sectors.agriculture.desc': 'Minister, koperatif, projet rural',
+
+    // Pricing
+    'pricing.title': 'Suɓo plan',
+    'pricing.subtitle': 'Solution ngam Minister, ONG e Entreprise Afrik',
+    'pricing.monthly': 'Lewru',
+    'pricing.annual': 'Hitaande',
+    'pricing.popular': 'Popular',
+    'pricing.choose': 'Suɓo plan',
+
+    'pricing.free.name': 'Free',
+    'pricing.starter.name': 'Starter',
+    'pricing.professional.name': 'Professional',
+    'pricing.enterprise.name': 'Enterprise',
+
+    // Auth
+    'auth.login.title': 'Naatir',
+    'auth.login.subtitle': 'Naatir e InsightGov Africa',
+    'auth.login.email': 'Email',
+    'auth.login.password': 'Konngol',
+    'auth.login.forgot': 'Hoto yiɗ konngol?',
+    'auth.login.submit': 'Naatir',
+
+    'auth.register.title': 'Sos konte',
+    'auth.register.name': 'Innde',
+    'auth.register.org': 'Innde organisation',
+    'auth.register.submit': 'Sos konte',
+
+    // Dashboard
+    'dashboard.welcome': 'Jaraama',
+    'dashboard.upload.title': 'Naatnu keɓe',
+    'dashboard.upload.drag': 'Drag e drop files',
+    'dashboard.upload.browse': 'Browse',
+    'dashboard.upload.formats': 'Format: CSV, XLS, XLSX',
+
+    'dashboard.kpis.title': 'KPIs',
+    'dashboard.charts.title': 'Garaas',
+    'dashboard.export.title': 'Yaltin',
+
+    // Wallet
+    'wallet.title': 'Kaalis',
+    'wallet.balance': 'Balanse',
+    'wallet.deposit': 'Naatna',
+    'wallet.withdraw': 'Yaltina',
+    'wallet.transfer': 'Neldir',
+    'wallet.transactions': 'Transaksioŋ',
+
+    // Common
+    'common.loading': 'Loowgol...',
+    'common.save': 'Danndu',
+    'common.cancel': 'Haaytu',
+    'common.delete': 'Momtu',
+    'common.edit': 'Waylu',
+    'common.search': 'Yiyla',
+    'common.filter': 'Ceerno',
+    'common.all': 'Fuɗɗude',
+    'common.none': 'Alaa',
+    'common.yes': 'Eey',
+    'common.no': 'Alaa',
+  },
+
+  // ============================================
+  // MALINKÉ / MANINKA (Haute Guinée)
+  // ============================================
+  man: {
+    // Navigation
+    'nav.home': 'So',
+    'nav.dashboard': 'Tablo',
+    'nav.datasets': 'Data',
+    'nav.settings': 'Settings',
+    'nav.pricing': 'Pri',
+    'nav.login': 'Kɛ',
+    'nav.logout': 'Bɔ',
+    'nav.register': 'I kɛ',
+
+    // Landing Page
+    'landing.hero.title': 'Tablo IA Afrika',
+    'landing.hero.subtitle': 'I data sigi insight la caya la',
+    'landing.hero.cta': 'Kɛ fre',
+    'landing.hero.demo': 'Demo ye',
+
+    'landing.features.title': 'Feature be la',
+    'landing.features.subtitle': 'I magan bɛɛ min bɛ data kɛ',
+
+    'landing.features.ai.title': 'AI Analysis',
+    'landing.features.ai.desc': 'GPT-4o kɛ i data analysis ani KPI sugandi',
+
+    'landing.features.upload.title': 'Upload easy',
+    'landing.features.upload.desc': 'CSV walima Excel upload, an bɛ baara kɛ',
+
+    // Sectors
+    'landing.sectors.title': 'I sector la',
+    'landing.sectors.health': 'Bana',
+    'landing.sectors.health.desc': 'Minister, hospital, program bana',
+    'landing.sectors.education': 'Kalanso',
+    'landing.sectors.education.desc': 'Minister, school, university',
+    'landing.sectors.agriculture': 'Sènè',
+    'landing.sectors.agriculture.desc': 'Minister, cooperative, projet rural',
+
+    // Pricing
+    'pricing.title': 'Plan sugandi',
+    'pricing.subtitle': 'Solution Minister, ONG ani Entreprise Afrika',
+    'pricing.monthly': 'Kalo',
+    'pricing.annual': 'San',
+    'pricing.popular': 'Popular',
+    'pricing.choose': 'Sugandi',
+
+    'pricing.free.name': 'Fre',
+    'pricing.starter.name': 'Starter',
+    'pricing.professional.name': 'Professional',
+    'pricing.enterprise.name': 'Enterprise',
+
+    // Auth
+    'auth.login.title': 'Kɛ',
+    'auth.login.subtitle': 'Kɛ InsightGov Africa la',
+    'auth.login.email': 'Email',
+    'auth.login.password': 'Password',
+    'auth.login.forgot': 'Password bin?',
+    'auth.login.submit': 'Kɛ',
+
+    'auth.register.title': 'Kɛ compte',
+    'auth.register.name': 'Tɔgɔ',
+    'auth.register.org': 'Organisation tɔgɔ',
+    'auth.register.submit': 'Kɛ compte',
+
+    // Dashboard
+    'dashboard.welcome': 'I ni sogoma',
+    'dashboard.upload.title': 'Data upload',
+    'dashboard.upload.drag': 'Drag drop files',
+    'dashboard.upload.browse': 'Browse',
+    'dashboard.upload.formats': 'Format: CSV, XLS, XLSX',
+
+    'dashboard.kpis.title': 'KPI',
+    'dashboard.charts.title': 'Graph',
+    'dashboard.export.title': 'Export',
+
+    // Wallet
+    'wallet.title': 'Wolde',
+    'wallet.balance': 'Balance',
+    'wallet.deposit': 'Don',
+    'wallet.withdraw': 'Sɔrɔ',
+    'wallet.transfer': 'Ci',
+    'wallet.transactions': 'Transaction',
+
+    // Common
+    'common.loading': 'Loading...',
+    'common.save': 'Save',
+    'common.cancel': 'Jɔsi',
+    'common.delete': 'Jɔsi',
+    'common.edit': 'Yɛlɛma',
+    'common.search': 'Ɲinini',
+    'common.filter': 'Filter',
+    'common.all': 'Bɛɛ',
+    'common.none': 'Tɛ',
+    'common.yes': 'Ow',
+    'common.no': 'Ayi',
+  },
 };
 
 // ============================================
@@ -446,12 +747,57 @@ export const africanCountries: Record<Locale, string[]> = {
     'Quénia', 'Tanzânia', 'Uganda', 'Etiópia', 'África do Sul', 'Madagáscar', 'Moçambique',
     'Angola', 'Sudão', 'Sudão do Sul', 'Somália', 'Eritreia',
   ].sort(),
+
+  // Guinea local languages - using French country names as base
+  sou: [
+    'Benen', 'Burkina Faso', 'Burundi', 'Kamerun', 'Kap Ver', 'Centrafrik',
+    'Komor', 'Kongo', 'Kote Divwa', 'Djibuti', 'Gabon', 'Gambi',
+    'Gana', 'Gine', 'Gine Bisau', 'Gine Ekwatorial', 'Liberia', 'Mali',
+    'Moritani', 'Moris', 'Nizer', 'Nizeria', 'RDC', 'Rwanda', 'Sao Tome',
+    'Senegal', 'Sierra Leone', 'Cad', 'Togo', 'Tunizi', 'Marok', 'Alzeri', 'Ezip',
+    'Kenya', 'Tanzani', 'Uganda', 'Etiopi', 'Afrik Sudi', 'Madagaskar', 'Mozambik',
+    'Angola', 'Sudan', 'Sudan Sudi', 'Somali', 'Eritre',
+  ].sort(),
+
+  ful: [
+    'Benen', 'Burkina Faso', 'Burundi', 'Kameruun', 'Kap Werde', 'Caka Afrik',
+    'Komoor', 'Konngo', 'Kottu Diwaar', 'Djibutti', 'Gabon', 'Gambiya',
+    'Ganaa', 'Gine', 'Gine Bisaawo', 'Gine Ekuwatooriyal', 'Liberiya', 'Maali',
+    'Muritani', 'Moriis', 'Nijeer', 'Nijeeriyaa', 'RDC', 'Ruwanda', 'Sawo Tome',
+    'Senegaal', 'Sierra Leone', 'Caad', 'Togo', 'Tunisiya', 'Maruk', 'Alseri', 'Ejipt',
+    'Kenya', 'Tanzaniya', 'Unganda', 'Ecoppi', 'Afrik borgo', 'Madagaskar', 'Mosambik',
+    'Angolaa', 'Sudaan', 'Sudaan borgo', 'Somaliya', 'Eritereya',
+  ].sort(),
+
+  man: [
+    'Bene', 'Burukina Faso', 'Burundi', 'Kamerun', 'Kape Werde', 'Cema Afrika',
+    'Komori', 'Kongo', 'Kote Dibua', 'Djibuti', 'Gabon', 'Gambi',
+    'Gana', 'Gine', 'Gine Bisau', 'Gine Ekwatorial', 'Liberia', 'Mali',
+    'Moritania', 'Morisi', 'Nize', 'Nizeria', 'RDC', 'Ruwanda', 'Sao Tome',
+    'Senegal', 'Siyea Leone', 'Cadi', 'Togo', 'Tunizi', 'Maroko', 'Aluze', 'Eziputi',
+    'Kenya', 'Tanzani', 'Uganda', 'Etiyopia', 'Afrika Duguma', 'Madagasikari', 'Mozambik',
+    'Angola', 'Sudan', 'Sudan Duguma', 'Somalia', 'Eritere',
+  ].sort(),
 };
+
+// Guinea Regions for local context
+export const guineaRegions = [
+  { code: 'CON', name: 'Conakry', capital: 'Conakry', population: 2000000 },
+  { code: 'NZA', name: 'N\'Zérékoré', capital: 'N\'Zérékoré', population: 1600000 },
+  { code: 'KAN', name: 'Kankan', capital: 'Kankan', population: 1100000 },
+  { code: 'KIN', name: 'Kindia', capital: 'Kindia', population: 900000 },
+  { code: 'LAB', name: 'Labé', capital: 'Labé', population: 600000 },
+  { code: 'BOK', name: 'Boké', capital: 'Boké', population: 500000 },
+  { code: 'FAR', name: 'Faranah', capital: 'Faranah', population: 400000 },
+  { code: 'MAM', name: 'Mamou', capital: 'Mamou', population: 350000 },
+] as const;
 
 export default {
   locales,
   defaultLocale,
   translations,
+  guineaLanguages,
+  guineaRegions,
   t,
   getLocaleFromPath,
   localizePath,
