@@ -427,20 +427,21 @@ function SimplePieChart({ data, config }: { data: ChartDataItem[]; config: KPICo
     return <div className="h-72 flex items-center justify-center text-gray-400">Aucune valeur</div>;
   }
 
-  let currentAngle = -90;
+  let angleAccumulator = -90;
   const segments = data.slice(0, 8).map((item, index) => {
     const value = Number(item.value) || 0;
     const percentage = (value / total) * 100;
     const angle = (percentage / 100) * 360;
-    const startAngle = currentAngle;
-    currentAngle += angle;
+    const startAngle = angleAccumulator;
+    const endAngle = angleAccumulator + angle;
+    angleAccumulator = endAngle;
     
     return {
       ...item,
       value,
       percentage,
       startAngle,
-      endAngle: currentAngle,
+      endAngle,
       color: CHART_COLORS[index % CHART_COLORS.length],
     };
   });
