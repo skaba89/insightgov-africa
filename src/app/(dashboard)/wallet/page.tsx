@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { WalletDashboard } from '@/components/wallet/wallet-dashboard';
 import { PaymentForm } from '@/components/wallet/payment-form';
-import { PaymentFormProps } from '@/components/wallet/payment-form';
 
 export default function WalletPage() {
   const [showPaymentForm, setShowPaymentForm] = useState(false);
