@@ -292,7 +292,7 @@ export async function getSecuritySummary(organizationId: string): Promise<{
   recentCriticalEvents: number
 }> {
   const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000)
-  
+
   const [totalEvents, failedLogins, securityViolations, recentCriticalEvents] = await Promise.all([
     prisma.auditLog.count({ where: { organizationId } }),
     prisma.auditLog.count({
@@ -305,6 +305,68 @@ export async function getSecuritySummary(organizationId: string): Promise<{
       where: { organizationId, severity: AuditSeverity.CRITICAL, createdAt: { gte: last24Hours } }
     }),
   ])
-  
+
   return { totalEvents, failedLogins, securityViolations, recentCriticalEvents }
+}
+
+/**
+ * AuditLogger class for object-oriented usage
+ * Provides a convenient wrapper around the audit logging functions
+ */
+export class AuditLogger {
+  private userId?: string;
+  private organizationId?: string;
+
+  constructor(options?: { userId?: string; organizationId?: string }) {
+    this.userId = options?.userId;
+    this.organizationId = options?.organizationId;
+  }
+
+  async log(
+    action: AuditAction,
+    description: string,
+    options?: {
+      severity?: AuditSeverity;
+      resourceId?: string;
+      resourceType?: string;
+      metadata?: Record<string, unknown>;
+      request?: NextRequest;
+    }
+  ): Promise<void> {
+    await logAudit({
+      action,
+      description,
+      severity: options?.severity,
+      resourceId: options?.resourceId,
+      resourceType: options?.resourceType,
+      metadata: options?.metadata,
+      request: options?.request,
+      userId: this.userId,
+      organizationId: this.organizationId,
+    });
+  }
+
+  async getLogs(params: {
+    userId?: string;
+    action?: AuditAction;
+    severity?: AuditSeverity;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ logs: AuditLogEntry[]; total: number }> {
+    return getAuditLogs({
+      organizationId: this.organizationId || '',
+      ...params,
+    });
+  }
+
+  async getSummary(): Promise<{
+    totalEvents: number;
+    failedLogins: number;
+    securityViolations: number;
+    recentCriticalEvents: number;
+  }> {
+    return getSecuritySummary(this.organizationId || '');
+  }
 }

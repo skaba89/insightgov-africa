@@ -5,7 +5,7 @@
  * Gracefully handles database connection errors with demo mode fallback.
  */
 
-import { NextAuthOptions } from 'next-auth';
+import { NextAuthOptions, getServerSession } from 'next-auth';
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { prisma, isDatabaseAvailable } from '@/lib/db';
@@ -207,4 +207,21 @@ declare module 'next-auth/jwt' {
     organizationName?: string | null;
     role?: string;
   }
+}
+
+/**
+ * Get the current session - wrapper for getServerSession
+ * Use this in server components and API routes
+ */
+export async function getSession() {
+  return getServerSession(authOptions);
+}
+
+/**
+ * Get the current user from session
+ * Returns null if not authenticated
+ */
+export async function getCurrentUser() {
+  const session = await getSession();
+  return session?.user || null;
 }
