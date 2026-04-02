@@ -84,8 +84,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 # Créer un utilisateur non-root pour la sécurité
 # UID/GID 1001: standard pour les applications Node.js
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+# Utiliser groupadd/useradd (Debian) au lieu de addgroup/adduser (Alpine)
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 --gid nodejs --shell /bin/bash nextjs
 
 # Créer les répertoires nécessaires avec les bonnes permissions
 RUN mkdir -p /app/.next /app/public /app/uploads /app/logs && \
