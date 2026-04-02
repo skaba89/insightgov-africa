@@ -13,8 +13,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-bun.lock
-package-lock.json
+# NOTE: bun.lock est nécessaire pour bun install --frozen-lockfile
+# package-lock.json
 
 # =============================================================================
 # BUILD OUTPUT
@@ -98,18 +98,21 @@ Makefile
 .prettierrc*
 .prettierignore
 .stylelintrc*
-tsconfig*.json
 jest.config.*
 vitest.config.*
 playwright.config.*
-postcss.config.*
-tailwind.config.*
-next.config.*
 sentry.*.config.*
 vercel.json
 render.yaml
 Caddyfile
-components.json
+
+# NOTE: Les fichiers de configuration suivants sont NÉCESSAIRES pour le build
+# et ne doivent PAS être exclus:
+# - tsconfig.json (TypeScript)
+# - next.config.ts (Next.js)
+# - tailwind.config.ts (Tailwind CSS)
+# - postcss.config.mjs (PostCSS)
+# - components.json (shadcn/ui)
 
 # =============================================================================
 # FICHIERS TEMPORAIRES ET LOGS
