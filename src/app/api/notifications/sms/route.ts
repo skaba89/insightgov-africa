@@ -27,7 +27,7 @@ const sendTemplateSchema = z.object({
     (val) => Object.keys(SMS_TEMPLATES).includes(val),
     { message: 'Template ID inval' }
   ),
-  variables: z.record(z.union([z.string(), z.number()])),
+  variables: z.record(z.string(), z.union([z.string(), z.number()] )),
 });
 
 const verifyPhoneSchema = z.object({

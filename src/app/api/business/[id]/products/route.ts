@@ -39,7 +39,7 @@ const createProductSchema = z.object({
   
   // Variantes
   hasVariants: z.boolean().default(false),
-  variants: z.record(z.any()).optional(),
+  variants: z.record(z.string(), z.any()).optional(),
   
   // Images
   images: z.array(z.string().url()).optional(),

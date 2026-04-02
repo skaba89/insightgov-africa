@@ -52,7 +52,7 @@ const createProductSchema = z.object({
   
   // Champs optionnels - Variantes
   hasVariants: z.boolean().optional().default(false),
-  variants: z.record(z.any()).optional().nullable(),
+  variants: z.record(z.string(), z.any()).optional().nullable(),
   
   // Champs optionnels - Images
   images: z.array(z.string().url()).max(10).optional(),

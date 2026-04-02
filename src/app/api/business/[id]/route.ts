@@ -44,7 +44,7 @@ const updateBusinessSchema = z.object({
   acceptCash: z.boolean().optional(),
   acceptCard: z.boolean().optional(),
   isOpen24h: z.boolean().optional(),
-  openingHours: z.record(z.any()).optional().nullable(),
+  openingHours: z.record(z.string(), z.any()).optional().nullable(),
   
   // Statut
   isActive: z.boolean().optional(),

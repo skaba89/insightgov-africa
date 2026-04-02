@@ -182,7 +182,7 @@ export const aiChatSchema = z.object({
     .min(1, 'Message cannot be empty')
     .max(2000, 'Message must be less than 2000 characters'),
   conversationId: uuidSchema.optional(),
-  context: z.record(z.unknown()).optional(),
+  context: z.record(z.string(), z.unknown()).optional(),
 })
 
 // ============ File Upload Validations ============

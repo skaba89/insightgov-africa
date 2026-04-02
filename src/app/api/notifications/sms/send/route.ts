@@ -16,7 +16,7 @@ const smsSendSchema = z.object({
   message: z.string().min(1, 'Message requis').max(1530, 'Message trop long'),
   priority: z.enum(['low', 'normal', 'high', 'urgent']).optional(),
   scheduledAt: z.string().datetime().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 // Rate limiter for SMS

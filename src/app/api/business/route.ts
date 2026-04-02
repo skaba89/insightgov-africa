@@ -45,7 +45,7 @@ const createBusinessSchema = z.object({
   acceptCash: z.boolean().default(true),
   acceptCard: z.boolean().default(false),
   isOpen24h: z.boolean().default(false),
-  openingHours: z.record(z.any()).optional(),
+  openingHours: z.record(z.string(), z.any()).optional(),
 });
 
 // =============================================================================

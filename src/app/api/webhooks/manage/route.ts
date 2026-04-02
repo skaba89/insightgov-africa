@@ -50,8 +50,8 @@ const getDeliveriesSchema = z.object({
 
 const triggerWebhookSchema = z.object({
   event: z.string(),
-  data: z.record(z.unknown()),
-  metadata: z.record(z.unknown()).optional(),
+  data: z.record(z.string(), z.unknown()),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 // =============================================================================

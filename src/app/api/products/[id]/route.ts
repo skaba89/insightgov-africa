@@ -40,7 +40,7 @@ const updateProductSchema = z.object({
   
   // Variantes
   hasVariants: z.boolean().optional(),
-  variants: z.record(z.any()).optional().nullable(),
+  variants: z.record(z.string(), z.any()).optional().nullable(),
   
   // Images
   images: z.array(z.string().url()).optional(),

@@ -42,7 +42,7 @@ const updateInvoiceSchema = z.object({
   notes: z.string().max(1000).optional().nullable(),
   
   // Métadonnées
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
 });
 
 /**
